@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    IPTV streams are overwhelmingly plain http://. Android blocks cleartext by default on
+    API 28+, which makes ExoPlayer fail to connect even though the stream is fine (and plays
+    in other IPTV players). Permit cleartext for all hosts, like TiviMate/IPTV Smarters do.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

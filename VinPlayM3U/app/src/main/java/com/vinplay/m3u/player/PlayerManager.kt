@@ -10,6 +10,8 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.extractor.DefaultExtractorsFactory
+import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
 import com.vinplay.m3u.data.net.HttpDefaults
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -68,7 +70,19 @@ class PlayerManager @Inject constructor(
             .setReadTimeoutMs(15_000)
         // DefaultDataSource also handles file:// / content:// for local media.
         val dataSourceFactory = DefaultDataSource.Factory(context, httpFactory)
-        return DefaultMediaSourceFactory(dataSourceFactory)
+
+        // Xtream-style live URLs (http://host:port/user/pass/id) carry no extension, so ExoPlayer
+        // falls back to progressive + the TS extractor. Live MPEG-TS frequently starts mid-GOP
+        // (no leading IDR) and needs constant-bitrate seeking; these flags make ExoPlayer tolerant
+        // of that the same way TiviMate / IPTV Smarters do, instead of erroring out.
+        val extractorsFactory = DefaultExtractorsFactory()
+            .setTsExtractorFlags(
+                DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or
+                    DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS
+            )
+            .setConstantBitrateSeekingEnabled(true)
+
+        return DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
     }
 
     /** Returns the shared player, creating it on first use. */
