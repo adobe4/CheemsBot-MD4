@@ -33,6 +33,10 @@ data class ChannelEntity(
     val tvgLogo: String? = null,
     val tvgName: String? = null,
     val kind: ChannelKind = ChannelKind.UNKNOWN,
+    // Per-channel HTTP headers a stream may require (from #EXTVLCOPT / URL |pipe options).
+    // Many IPTV streams only play when their specific User-Agent/Referer is sent.
+    val userAgent: String? = null,
+    val referrer: String? = null,
     val orderIndex: Long = 0,
     val testStatus: TestStatus = TestStatus.UNTESTED,
     val testStatusCode: Int? = null,

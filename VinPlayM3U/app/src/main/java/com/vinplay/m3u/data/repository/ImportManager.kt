@@ -95,6 +95,8 @@ class ImportManager @Inject constructor(
         tvgName = tvgName,
         tvgLogo = tvgLogo,
         kind = kind,
+        userAgent = userAgent,
+        referrer = referrer,
         orderIndex = order
     )
 }

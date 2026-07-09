@@ -21,6 +21,7 @@ object DatabaseModule {
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, AppDatabase.NAME)
             // Foreign keys enforce cascade delete of channels with their playlist.
+            .addMigrations(AppDatabase.MIGRATION_1_2)
             .build()
 
     @Provides

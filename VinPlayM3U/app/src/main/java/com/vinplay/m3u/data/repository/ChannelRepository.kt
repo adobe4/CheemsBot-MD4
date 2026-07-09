@@ -126,7 +126,7 @@ class ChannelRepository @Inject constructor(
                         semaphore.withPermit {
                             val channel = channelDao.getById(id) ?: return@withPermit
                             channelDao.markStatus(listOf(id), TestStatus.TESTING)
-                            val result = linkTester.test(channel.url)
+                            val result = linkTester.test(channel.url, channel.userAgent, channel.referrer)
                             channelDao.updateTestResult(id, result.status, result.code, System.currentTimeMillis())
                         }
                         _testProgress.value = TestProgress(done.incrementAndGet(), ids.size, true)

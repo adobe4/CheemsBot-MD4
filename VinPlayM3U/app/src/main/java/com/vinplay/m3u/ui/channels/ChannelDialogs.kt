@@ -33,6 +33,8 @@ fun EditChannelDialog(
     var name by remember { mutableStateOf(channel.name) }
     var url by remember { mutableStateOf(channel.url) }
     var group by remember { mutableStateOf(channel.groupTitle) }
+    var userAgent by remember { mutableStateOf(channel.userAgent ?: "") }
+    var referrer by remember { mutableStateOf(channel.referrer ?: "") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -45,6 +47,8 @@ fun EditChannelDialog(
                 OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(url, { url = it }, label = { Text("Stream URL") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(group, { group = it }, label = { Text("Group") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(userAgent, { userAgent = it }, label = { Text("User-Agent (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(referrer, { referrer = it }, label = { Text("Referer (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             }
         },
         confirmButton = {
@@ -55,7 +59,9 @@ fun EditChannelDialog(
                         channel.copy(
                             name = name.trim(),
                             url = url.trim(),
-                            groupTitle = group.trim()
+                            groupTitle = group.trim(),
+                            userAgent = userAgent.trim().ifBlank { null },
+                            referrer = referrer.trim().ifBlank { null }
                         )
                     )
                 }

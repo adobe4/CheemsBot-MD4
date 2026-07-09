@@ -10,5 +10,7 @@ data class ParsedChannel(
     val tvgId: String?,
     val tvgName: String?,
     val tvgLogo: String?,
-    val kind: ChannelKind
+    val kind: ChannelKind,
+    val userAgent: String? = null,
+    val referrer: String? = null
 )

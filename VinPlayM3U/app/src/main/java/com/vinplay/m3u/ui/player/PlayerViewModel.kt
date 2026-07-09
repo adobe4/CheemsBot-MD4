@@ -32,7 +32,7 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             val ch = channelRepository.get(channelId)
             _channel.value = ch
-            if (ch != null) playerManager.play(ch.url)
+            if (ch != null) playerManager.play(ch.url, ch.userAgent, ch.referrer)
         }
     }
 

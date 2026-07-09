@@ -60,14 +60,21 @@ class PlayerManager @Inject constructor(
         }
     }
 
+    // Held so per-channel headers can be swapped in before each prepare(). The MediaSourceFactory
+    // reads this same instance's default request properties when it creates a data source, so
+    // updating them here takes effect on the next stream without rebuilding the player.
     @OptIn(UnstableApi::class)
-    private fun buildMediaSourceFactory(): MediaSource.Factory {
-        val httpFactory = DefaultHttpDataSource.Factory()
+    private val httpFactory: DefaultHttpDataSource.Factory by lazy {
+        DefaultHttpDataSource.Factory()
             .setUserAgent(HttpDefaults.USER_AGENT)
             .setAllowCrossProtocolRedirects(true)
             .setKeepPostFor302Redirects(true)
             .setConnectTimeoutMs(15_000)
             .setReadTimeoutMs(15_000)
+    }
+
+    @OptIn(UnstableApi::class)
+    private fun buildMediaSourceFactory(): MediaSource.Factory {
         // DefaultDataSource also handles file:// / content:// for local media.
         val dataSourceFactory = DefaultDataSource.Factory(context, httpFactory)
 
@@ -95,7 +102,14 @@ class PlayerManager @Inject constructor(
                 player = it
             }
 
-    fun play(url: String) {
+    @OptIn(UnstableApi::class)
+    fun play(url: String, userAgent: String? = null, referrer: String? = null) {
+        // Apply this channel's required headers (or the VLC default) before preparing.
+        val headers = HashMap<String, String>()
+        headers["User-Agent"] = userAgent?.takeIf { it.isNotBlank() } ?: HttpDefaults.USER_AGENT
+        referrer?.takeIf { it.isNotBlank() }?.let { headers["Referer"] = it }
+        httpFactory.setDefaultRequestProperties(headers)
+
         val exo = getOrCreate()
         _state.value = PlaybackState(isBuffering = true)
         exo.setMediaItem(MediaItem.fromUri(url))
