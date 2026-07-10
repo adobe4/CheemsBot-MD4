@@ -2,6 +2,7 @@ package com.vinplay.m3u.data.repository
 
 import com.vinplay.m3u.data.local.dao.ChannelDao
 import com.vinplay.m3u.data.local.entity.ChannelEntity
+import com.vinplay.m3u.data.model.ChannelKind
 import com.vinplay.m3u.data.model.TestStatus
 import com.vinplay.m3u.data.net.LinkTester
 import kotlinx.coroutines.Dispatchers
@@ -68,6 +69,44 @@ class ChannelRepository @Inject constructor(
     suspend fun renameGroup(playlistId: Long, oldName: String, newName: String) {
         channelDao.renameGroup(playlistId, oldName, newName.trim())
         playlistRepository.touch(playlistId)
+    }
+
+    /**
+     * Find & replace [find] with [replacement] in channel names. When [scopeToFilter] is true the
+     * change is limited to channels matching [filter]; otherwise it hits the whole playlist
+     * (all groups/kinds). Returns how many channels changed.
+     */
+    suspend fun replaceInNames(
+        playlistId: Long,
+        find: String,
+        replacement: String,
+        filter: ChannelFilter,
+        scopeToFilter: Boolean
+    ): Int {
+        if (find.isEmpty()) return 0
+        val changed = channelDao.replaceInNames(
+            playlistId = playlistId,
+            find = find,
+            replacement = replacement,
+            group = if (scopeToFilter) filter.group else null,
+            filterKind = if (scopeToFilter) filter.kindName else null,
+            query = if (scopeToFilter) filter.query else ""
+        )
+        if (changed > 0) playlistRepository.touch(playlistId)
+        return changed
+    }
+
+    /** Set kind for all channels matching the current filter. Returns how many changed. */
+    suspend fun setKindFiltered(playlistId: Long, filter: ChannelFilter, kind: ChannelKind): Int {
+        val changed = channelDao.setKindFiltered(
+            playlistId = playlistId,
+            kind = kind.name,
+            group = filter.group,
+            filterKind = filter.kindName,
+            query = filter.query
+        )
+        if (changed > 0) playlistRepository.touch(playlistId)
+        return changed
     }
 
     /** Persist a new ordering for a contiguous slice the user dragged. */

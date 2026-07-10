@@ -85,6 +85,8 @@ fun ChannelsScreen(
     var movingGroup by remember { mutableStateOf<ChannelEntity?>(null) }
     var movingPlaylist by remember { mutableStateOf<ChannelEntity?>(null) }
     var renamingGroup by remember { mutableStateOf<String?>(null) }
+    var showFindReplace by remember { mutableStateOf(false) }
+    var showSetKind by remember { mutableStateOf(false) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("audio/x-mpegurl")
@@ -155,6 +157,12 @@ fun ChannelsScreen(
                                 overflowOpen = false; renamingGroup = g
                             })
                         }
+                        DropdownMenuItem(text = { Text("Find & replace in names") }, onClick = {
+                            overflowOpen = false; showFindReplace = true
+                        })
+                        DropdownMenuItem(text = { Text("Set type (filtered)") }, onClick = {
+                            overflowOpen = false; showSetKind = true
+                        })
                         DropdownMenuItem(text = { Text("Export M3U") }, onClick = {
                             overflowOpen = false
                             exportLauncher.launch("${ui.playlistName.ifBlank { "playlist" }}.m3u")
@@ -237,6 +245,30 @@ fun ChannelsScreen(
             channel = ch,
             onSave = { viewModel.updateChannel(it); editing = null },
             onDismiss = { editing = null }
+        )
+    }
+    if (showFindReplace) {
+        val filterActive = ui.filter.query.isNotEmpty() || ui.filter.group != null || ui.filter.kind != null
+        FindReplaceDialog(
+            filterActive = filterActive,
+            onConfirm = { find, replacement, scope2 ->
+                showFindReplace = false
+                viewModel.replaceInNames(find, replacement, scope2) { changed ->
+                    scope.launch { snackbar.showSnackbar("Updated $changed channels") }
+                }
+            },
+            onDismiss = { showFindReplace = false }
+        )
+    }
+    if (showSetKind) {
+        SetKindDialog(
+            onConfirm = { kind ->
+                showSetKind = false
+                viewModel.setKindForFiltered(kind) { changed ->
+                    scope.launch { snackbar.showSnackbar("Set $changed channels to ${kind.name}") }
+                }
+            },
+            onDismiss = { showSetKind = false }
         )
     }
     movingGroup?.let { ch ->

@@ -205,6 +205,25 @@ class ChannelsViewModel @Inject constructor(
         channelRepository.reorder(pairs, playlistId)
     }
 
+    // ---- Batch name edit / kind ----
+
+    /** Find & replace across names. [scopeToFilter]=false hits the whole playlist. */
+    fun replaceInNames(find: String, replacement: String, scopeToFilter: Boolean, onDone: (Int) -> Unit) =
+        viewModelScope.launch {
+            val changed = channelRepository.replaceInNames(
+                playlistId, find, replacement, _ui.value.filter, scopeToFilter
+            )
+            reload(reset = false)
+            onDone(changed)
+        }
+
+    /** Set kind for every channel matching the current filter. */
+    fun setKindForFiltered(kind: ChannelKind, onDone: (Int) -> Unit) = viewModelScope.launch {
+        val changed = channelRepository.setKindFiltered(playlistId, _ui.value.filter, kind)
+        reload(reset = false)
+        onDone(changed)
+    }
+
     // ---- Bulk test ----
 
     fun testAllFiltered() = viewModelScope.launch {

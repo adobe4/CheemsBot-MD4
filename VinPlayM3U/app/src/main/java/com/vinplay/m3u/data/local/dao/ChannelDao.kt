@@ -127,6 +127,55 @@ interface ChannelDao {
     @Query("UPDATE channels SET groupTitle = :newName WHERE playlistId = :playlistId AND groupTitle = :oldName AND deletedAt IS NULL")
     suspend fun renameGroup(playlistId: Long, oldName: String, newName: String)
 
+    // ---- Batch name edit / kind ----
+
+    /**
+     * Find & replace a substring in channel names across the playlist (case-sensitive, like the
+     * text itself — good for stripping emojis/promo words). [group]/[filterKind]/[query] scope it
+     * to the current filter when non-null/non-empty, or the whole playlist otherwise. Resulting
+     * double spaces are collapsed and the name is trimmed. Returns the number of rows changed.
+     */
+    @Query(
+        """
+        UPDATE channels
+        SET name = TRIM(REPLACE(REPLACE(name, :find, :replacement), '  ', ' '))
+        WHERE playlistId = :playlistId
+          AND deletedAt IS NULL
+          AND (:group IS NULL OR groupTitle = :group)
+          AND (:filterKind IS NULL OR kind = :filterKind)
+          AND (:query = '' OR name LIKE '%' || :query || '%')
+          AND name LIKE '%' || :find || '%'
+        """
+    )
+    suspend fun replaceInNames(
+        playlistId: Long,
+        find: String,
+        replacement: String,
+        group: String?,
+        filterKind: String?,
+        query: String
+    ): Int
+
+    /** Set the kind (LIVE/VOD/SERIES/UNKNOWN) for every channel matching the current filter. */
+    @Query(
+        """
+        UPDATE channels
+        SET kind = :kind
+        WHERE playlistId = :playlistId
+          AND deletedAt IS NULL
+          AND (:group IS NULL OR groupTitle = :group)
+          AND (:filterKind IS NULL OR kind = :filterKind)
+          AND (:query = '' OR name LIKE '%' || :query || '%')
+        """
+    )
+    suspend fun setKindFiltered(
+        playlistId: Long,
+        kind: String,
+        group: String?,
+        filterKind: String?,
+        query: String
+    ): Int
+
     // ---- Test results ----
 
     @Query("UPDATE channels SET testStatus = :status WHERE id IN (:ids)")
