@@ -205,6 +205,49 @@ class ChannelsViewModel @Inject constructor(
         channelRepository.reorder(pairs, playlistId)
     }
 
+    // ---- Multi-select ----
+
+    private val _selectedIds = MutableStateFlow<Set<Long>>(emptySet())
+    val selectedIds = _selectedIds.asStateFlow()
+
+    fun toggleSelect(id: Long) {
+        _selectedIds.value = _selectedIds.value.toMutableSet().apply { if (!add(id)) remove(id) }
+    }
+
+    fun selectAllLoaded() {
+        _selectedIds.value = _ui.value.channels.map { it.id }.toSet()
+    }
+
+    fun clearSelection() { _selectedIds.value = emptySet() }
+
+    fun deleteSelected() = viewModelScope.launch {
+        val ids = _selectedIds.value.toList()
+        if (ids.isEmpty()) return@launch
+        lastDeletedIds = ids
+        channelRepository.softDelete(ids, playlistId)
+        clearSelection()
+        reload(reset = false)
+    }
+
+    fun moveSelectedToGroup(group: String) = viewModelScope.launch {
+        channelRepository.moveManyToGroup(_selectedIds.value.toList(), group, playlistId)
+        clearSelection()
+        reload(reset = false)
+    }
+
+    fun moveSelectedToPlaylist(targetPlaylistId: Long) = viewModelScope.launch {
+        channelRepository.moveManyToPlaylist(_selectedIds.value.toList(), targetPlaylistId, playlistId)
+        clearSelection()
+        reload(reset = false)
+    }
+
+    fun copySelectedToPlaylist(targetPlaylistId: Long, onDone: (Int) -> Unit) = viewModelScope.launch {
+        val ids = _selectedIds.value.toList()
+        channelRepository.copyManyToPlaylist(ids, targetPlaylistId)
+        clearSelection()
+        onDone(ids.size)
+    }
+
     // ---- Batch name edit / kind ----
 
     /** Find & replace across names. [scopeToFilter]=false hits the whole playlist. */

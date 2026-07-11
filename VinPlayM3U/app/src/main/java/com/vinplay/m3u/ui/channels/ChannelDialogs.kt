@@ -134,6 +134,52 @@ fun FindReplaceDialog(
     )
 }
 
+/** Searchable category picker — scales to thousands of groups, unlike a chip row. */
+@Composable
+fun GroupPickerDialog(
+    groups: List<String>,
+    selected: String?,
+    onPick: (String?) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var query by remember { mutableStateOf("") }
+    val filtered = remember(groups, query) {
+        if (query.isBlank()) groups else groups.filter { it.contains(query, ignoreCase = true) }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Category") },
+        text = {
+            Column(Modifier.heightIn(max = 420.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    label = { Text("Search categories") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    Text(
+                        if (selected == null) "All categories  ✓" else "All categories",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.fillMaxWidth().clickable { onPick(null) }.padding(vertical = 12.dp)
+                    )
+                    filtered.forEach { g ->
+                        val label = g.ifBlank { "(no category)" }
+                        Text(
+                            if (selected == g) "$label  ✓" else label,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.fillMaxWidth().clickable { onPick(g) }.padding(vertical = 12.dp)
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } }
+    )
+}
+
 /** Bulk-set the type (LIVE/VOD/SERIES/UNKNOWN) for all channels matching the current filter. */
 @Composable
 fun SetKindDialog(

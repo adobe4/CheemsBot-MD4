@@ -66,6 +66,33 @@ class ChannelRepository @Inject constructor(
         playlistRepository.touch(sourcePlaylistId)
     }
 
+    // ---- Multi-select bulk operations ----
+
+    suspend fun moveManyToGroup(ids: List<Long>, group: String, playlistId: Long) {
+        if (ids.isEmpty()) return
+        channelDao.moveToGroupBulk(ids, group.trim())
+        playlistRepository.touch(playlistId)
+    }
+
+    suspend fun moveManyToPlaylist(ids: List<Long>, targetPlaylistId: Long, sourcePlaylistId: Long) {
+        if (ids.isEmpty()) return
+        channelDao.moveToPlaylistBulk(ids, targetPlaylistId)
+        playlistRepository.touch(targetPlaylistId)
+        playlistRepository.touch(sourcePlaylistId)
+    }
+
+    /** Duplicate the given channels into another playlist, keeping the originals. */
+    suspend fun copyManyToPlaylist(ids: List<Long>, targetPlaylistId: Long) {
+        if (ids.isEmpty()) return
+        val originals = channelDao.getByIds(ids)
+        var order = channelDao.maxOrderIndex(targetPlaylistId) + 1
+        val copies = originals.map {
+            it.copy(id = 0, playlistId = targetPlaylistId, orderIndex = order++, deletedAt = null)
+        }
+        channelDao.insertAll(copies)
+        playlistRepository.touch(targetPlaylistId)
+    }
+
     suspend fun renameGroup(playlistId: Long, oldName: String, newName: String) {
         channelDao.renameGroup(playlistId, oldName, newName.trim())
         playlistRepository.touch(playlistId)

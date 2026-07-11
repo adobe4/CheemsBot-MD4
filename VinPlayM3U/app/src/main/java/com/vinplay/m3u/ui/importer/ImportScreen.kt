@@ -55,6 +55,7 @@ fun ImportScreen(
 
     var url by remember { mutableStateOf("") }
     var pasted by remember { mutableStateOf("") }
+    var bulk by remember { mutableStateOf("") }
 
     Scaffold(
         topBar = {
@@ -134,11 +135,34 @@ fun ImportScreen(
                     ) { Text("Import pasted") }
                 }
             }
+
+            // Bulk import — multiple links at once
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SectionHeader(Icons.Default.Link, "Bulk import (multiple links)")
+                    Text(
+                        "Paste several M3U links (one per line, or mixed into any text). Every http/https link is detected and imported in turn.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value = bulk,
+                        onValueChange = { bulk = it },
+                        label = { Text("https://…/a.m3u\nhttps://…/b.m3u8\n…") },
+                        modifier = Modifier.fillMaxWidth().height(140.dp)
+                    )
+                    Button(
+                        onClick = { viewModel.importBulkLinks(bulk) },
+                        enabled = bulk.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Detect & import all") }
+                }
+            }
         }
     }
 
     when (val s = state) {
-        is ImportViewModel.ImportState.Running -> ProgressDialog(s.imported)
+        is ImportViewModel.ImportState.Running -> ProgressDialog(s.imported, s.note)
         is ImportViewModel.ImportState.Success -> ResultDialog(
             title = "Import complete",
             message = "Imported ${s.imported} channels.",
@@ -166,7 +190,7 @@ private fun SectionHeader(icon: androidx.compose.ui.graphics.vector.ImageVector,
 }
 
 @Composable
-private fun ProgressDialog(imported: Int) {
+private fun ProgressDialog(imported: Int, note: String? = null) {
     androidx.compose.material3.AlertDialog(
         onDismissRequest = {},
         confirmButton = {},
@@ -179,6 +203,10 @@ private fun ProgressDialog(imported: Int) {
                     "Imported ${"%,d".format(imported)} channels…",
                     textAlign = TextAlign.Center
                 )
+                note?.let {
+                    androidx.compose.foundation.layout.Spacer(Modifier.height(4.dp))
+                    Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
                 LinearProgressIndicator(Modifier.fillMaxWidth())
             }

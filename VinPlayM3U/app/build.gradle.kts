@@ -11,11 +11,13 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.vinplay.m3u"
+        // Distinct applicationId so this build installs alongside any earlier com.vinplay.m3u
+        // install instead of replacing it. (namespace stays com.vinplay.m3u for the code.)
+        applicationId = "com.vinplay.m3u.pro"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }

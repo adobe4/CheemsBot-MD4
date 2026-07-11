@@ -115,6 +115,12 @@ interface ChannelDao {
     @Query("UPDATE channels SET playlistId = :targetPlaylistId, orderIndex = :orderIndex WHERE id = :id")
     suspend fun moveToPlaylist(id: Long, targetPlaylistId: Long, orderIndex: Long)
 
+    @Query("UPDATE channels SET groupTitle = :group WHERE id IN (:ids)")
+    suspend fun moveToGroupBulk(ids: List<Long>, group: String)
+
+    @Query("UPDATE channels SET playlistId = :targetPlaylistId WHERE id IN (:ids)")
+    suspend fun moveToPlaylistBulk(ids: List<Long>, targetPlaylistId: Long)
+
     @Query("UPDATE channels SET orderIndex = :orderIndex WHERE id = :id")
     suspend fun setOrderIndex(id: Long, orderIndex: Long)
 

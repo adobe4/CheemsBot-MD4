@@ -2,7 +2,9 @@ package com.vinplay.m3u.ui.channels
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -16,13 +18,18 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.DriveFileMove
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Upload
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.DropdownMenu
@@ -87,6 +94,14 @@ fun ChannelsScreen(
     var renamingGroup by remember { mutableStateOf<String?>(null) }
     var showFindReplace by remember { mutableStateOf(false) }
     var showSetKind by remember { mutableStateOf(false) }
+    var showGroupPicker by remember { mutableStateOf(false) }
+    // Multi-select bulk targets (true = a dialog is open for the current selection).
+    var bulkMoveGroup by remember { mutableStateOf(false) }
+    var bulkMovePlaylist by remember { mutableStateOf(false) }
+    var bulkCopyPlaylist by remember { mutableStateOf(false) }
+
+    val selectedIds by viewModel.selectedIds.collectAsStateWithLifecycle()
+    val selectionActive = selectedIds.isNotEmpty()
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("audio/x-mpegurl")
@@ -109,6 +124,23 @@ fun ChannelsScreen(
 
     Scaffold(
         topBar = {
+          if (selectionActive) {
+            SelectionTopBar(
+                count = selectedIds.size,
+                onClose = { viewModel.clearSelection() },
+                onSelectAllLoaded = { viewModel.selectAllLoaded() },
+                onDelete = {
+                    viewModel.deleteSelected()
+                    scope.launch {
+                        val r = snackbar.showSnackbar("Deleted selected channels", actionLabel = "Undo")
+                        if (r == SnackbarResult.ActionPerformed) viewModel.undoDelete()
+                    }
+                },
+                onMoveToGroup = { bulkMoveGroup = true },
+                onMoveToPlaylist = { bulkMovePlaylist = true },
+                onCopyToPlaylist = { bulkCopyPlaylist = true }
+            )
+          } else {
             TopAppBar(
                 title = {
                     Column {
@@ -170,6 +202,7 @@ fun ChannelsScreen(
                     }
                 }
             )
+          }
         },
         snackbarHost = { SnackbarHost(snackbar) }
     ) { padding ->
@@ -186,11 +219,11 @@ fun ChannelsScreen(
             }
 
             FilterBar(
-                groups = ui.groups,
+                groupCount = ui.groups.size,
                 selectedGroup = ui.filter.group,
                 selectedKind = ui.filter.kind,
-                onGroup = viewModel::setGroup,
-                onKind = viewModel::setKind
+                onKind = viewModel::setKind,
+                onOpenGroupPicker = { showGroupPicker = true }
             )
 
             if (testProgress.running) {
@@ -219,9 +252,14 @@ fun ChannelsScreen(
                             channel = channel,
                             canMoveUp = index > 0,
                             canMoveDown = index < ui.channels.size - 1,
+                            selected = channel.id in selectedIds,
+                            selectionActive = selectionActive,
                             onMoveUp = { viewModel.reorder(index, index - 1) },
                             onMoveDown = { viewModel.reorder(index, index + 1) },
-                            onPlay = { onPlay(channel.id) },
+                            onClick = {
+                                if (selectionActive) viewModel.toggleSelect(channel.id) else onPlay(channel.id)
+                            },
+                            onLongClick = { viewModel.toggleSelect(channel.id) },
                             onEdit = { editing = channel },
                             onMoveGroup = { movingGroup = channel },
                             onMovePlaylist = { movingPlaylist = channel },
@@ -271,6 +309,42 @@ fun ChannelsScreen(
             onDismiss = { showSetKind = false }
         )
     }
+    if (showGroupPicker) {
+        GroupPickerDialog(
+            groups = ui.groups,
+            selected = ui.filter.group,
+            onPick = { viewModel.setGroup(it); showGroupPicker = false },
+            onDismiss = { showGroupPicker = false }
+        )
+    }
+    // ---- Multi-select bulk targets ----
+    if (bulkMoveGroup) {
+        MoveToGroupDialog(
+            groups = ui.groups,
+            current = "",
+            onConfirm = { viewModel.moveSelectedToGroup(it); bulkMoveGroup = false },
+            onDismiss = { bulkMoveGroup = false }
+        )
+    }
+    if (bulkMovePlaylist) {
+        MoveToPlaylistDialog(
+            playlists = ui.otherPlaylists,
+            onConfirm = { viewModel.moveSelectedToPlaylist(it); bulkMovePlaylist = false },
+            onDismiss = { bulkMovePlaylist = false }
+        )
+    }
+    if (bulkCopyPlaylist) {
+        MoveToPlaylistDialog(
+            playlists = ui.otherPlaylists,
+            onConfirm = { target ->
+                viewModel.copySelectedToPlaylist(target) { count ->
+                    scope.launch { snackbar.showSnackbar("Copied $count channels") }
+                }
+                bulkCopyPlaylist = false
+            },
+            onDismiss = { bulkCopyPlaylist = false }
+        )
+    }
     movingGroup?.let { ch ->
         MoveToGroupDialog(
             groups = ui.groups,
@@ -300,56 +374,88 @@ fun ChannelsScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun FilterBar(
-    groups: List<String>,
-    selectedGroup: String?,
-    selectedKind: ChannelKind?,
-    onGroup: (String?) -> Unit,
-    onKind: (ChannelKind?) -> Unit
+private fun SelectionTopBar(
+    count: Int,
+    onClose: () -> Unit,
+    onSelectAllLoaded: () -> Unit,
+    onDelete: () -> Unit,
+    onMoveToGroup: () -> Unit,
+    onMoveToPlaylist: () -> Unit,
+    onCopyToPlaylist: () -> Unit
 ) {
-    Column {
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            FilterChip(selected = selectedKind == null, onClick = { onKind(null) }, label = { Text("All") })
-            ChannelKind.entries.forEach { kind ->
-                FilterChip(
-                    selected = selectedKind == kind,
-                    onClick = { onKind(if (selectedKind == kind) null else kind) },
-                    label = { Text(kind.name) }
+    var menu by remember { mutableStateOf(false) }
+    TopAppBar(
+        title = { Text("$count selected") },
+        navigationIcon = {
+            IconButton(onClick = onClose) { Icon(Icons.Default.Close, contentDescription = "Cancel selection") }
+        },
+        actions = {
+            IconButton(onClick = onSelectAllLoaded) { Icon(Icons.Default.SelectAll, contentDescription = "Select all loaded") }
+            IconButton(onClick = onMoveToGroup) { Icon(Icons.Default.DriveFileMove, contentDescription = "Move to category") }
+            IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, contentDescription = "Delete selected") }
+            IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "More") }
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(
+                    text = { Text("Move to playlist") },
+                    leadingIcon = { Icon(Icons.Default.Upload, null) },
+                    onClick = { menu = false; onMoveToPlaylist() }
+                )
+                DropdownMenuItem(
+                    text = { Text("Copy to playlist") },
+                    leadingIcon = { Icon(Icons.Default.ContentCopy, null) },
+                    onClick = { menu = false; onCopyToPlaylist() }
                 )
             }
         }
-        if (groups.isNotEmpty()) {
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                AssistChip(
-                    onClick = { onGroup(null) },
-                    label = { Text(if (selectedGroup == null) "All groups ✓" else "All groups") }
-                )
-                groups.forEach { g ->
-                    FilterChip(
-                        selected = selectedGroup == g,
-                        onClick = { onGroup(if (selectedGroup == g) null else g) },
-                        label = { Text(g.ifBlank { "(none)" }) }
-                    )
-                }
-            }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FilterBar(
+    groupCount: Int,
+    selectedGroup: String?,
+    selectedKind: ChannelKind?,
+    onKind: (ChannelKind?) -> Unit,
+    onOpenGroupPicker: () -> Unit
+) {
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Searchable category picker (scales past a chip row).
+        FilterChip(
+            selected = selectedGroup != null,
+            onClick = onOpenGroupPicker,
+            label = {
+                Text(selectedGroup?.ifBlank { "(no category)" } ?: if (groupCount > 0) "All categories" else "Categories")
+            },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) }
+        )
+        FilterChip(selected = selectedKind == null, onClick = { onKind(null) }, label = { Text("All") })
+        ChannelKind.entries.forEach { kind ->
+            FilterChip(
+                selected = selectedKind == kind,
+                onClick = { onKind(if (selectedKind == kind) null else kind) },
+                label = { Text(kind.name) }
+            )
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ChannelRow(
     channel: ChannelEntity,
     canMoveUp: Boolean,
     canMoveDown: Boolean,
+    selected: Boolean,
+    selectionActive: Boolean,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
-    onPlay: () -> Unit,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
     onEdit: () -> Unit,
     onMoveGroup: () -> Unit,
     onMovePlaylist: () -> Unit,
@@ -357,10 +463,22 @@ private fun ChannelRow(
 ) {
     var menu by remember { mutableStateOf(false) }
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onPlay).padding(horizontal = 16.dp, vertical = 10.dp),
+        Modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .background(if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else Color.Transparent)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        StatusDot(color = statusColor(channel.testStatus))
+        if (selectionActive) {
+            Icon(
+                if (selected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                contentDescription = if (selected) "Selected" else "Not selected",
+                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            StatusDot(color = statusColor(channel.testStatus))
+        }
         Column(Modifier.weight(1f).padding(start = 12.dp)) {
             Text(channel.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
@@ -374,19 +492,21 @@ private fun ChannelRow(
                 overflow = TextOverflow.Ellipsis
             )
         }
-        IconButton(onClick = onPlay) { Icon(Icons.Default.PlayArrow, contentDescription = "Play") }
-        IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "More") }
-        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-            DropdownMenuItem(text = { Text("Edit / replace link") }, onClick = { menu = false; onEdit() })
-            if (canMoveUp) DropdownMenuItem(text = { Text("Move up") }, onClick = { menu = false; onMoveUp() })
-            if (canMoveDown) DropdownMenuItem(text = { Text("Move down") }, onClick = { menu = false; onMoveDown() })
-            DropdownMenuItem(text = { Text("Move to group") }, onClick = { menu = false; onMoveGroup() })
-            DropdownMenuItem(
-                text = { Text("Move to playlist") },
-                leadingIcon = { Icon(Icons.Default.Upload, null) },
-                onClick = { menu = false; onMovePlaylist() }
-            )
-            DropdownMenuItem(text = { Text("Delete") }, onClick = { menu = false; onDelete() })
+        if (!selectionActive) {
+            IconButton(onClick = onClick) { Icon(Icons.Default.PlayArrow, contentDescription = "Play") }
+            IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "More") }
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(text = { Text("Edit / replace link") }, onClick = { menu = false; onEdit() })
+                if (canMoveUp) DropdownMenuItem(text = { Text("Move up") }, onClick = { menu = false; onMoveUp() })
+                if (canMoveDown) DropdownMenuItem(text = { Text("Move down") }, onClick = { menu = false; onMoveDown() })
+                DropdownMenuItem(text = { Text("Move to group") }, onClick = { menu = false; onMoveGroup() })
+                DropdownMenuItem(
+                    text = { Text("Move to playlist") },
+                    leadingIcon = { Icon(Icons.Default.Upload, null) },
+                    onClick = { menu = false; onMovePlaylist() }
+                )
+                DropdownMenuItem(text = { Text("Delete") }, onClick = { menu = false; onDelete() })
+            }
         }
     }
 }
