@@ -155,6 +155,13 @@ class ChannelsViewModel @Inject constructor(
         reload(reset = true)
     }
 
+    /** Scan the whole playlist for same-name + same-url duplicates and soft-delete the extras. */
+    fun removeDuplicates(onDone: (Int) -> Unit) = viewModelScope.launch {
+        lastDeletedIds = channelRepository.removeDuplicates(playlistId)
+        reload(reset = false)
+        onDone(lastDeletedIds.size)
+    }
+
     fun undoDelete() = viewModelScope.launch {
         if (lastDeletedIds.isEmpty()) return@launch
         channelRepository.restore(lastDeletedIds, playlistId)

@@ -174,6 +174,23 @@ interface ChannelDao {
         query: String
     ): Int
 
+    /**
+     * Ids of duplicate channels (same name AND same url within the playlist), keeping the first
+     * occurrence (lowest id) of each unique name+url and returning all the rest for removal.
+     */
+    @Query(
+        """
+        SELECT id FROM channels
+        WHERE playlistId = :playlistId AND deletedAt IS NULL
+          AND id NOT IN (
+            SELECT MIN(id) FROM channels
+            WHERE playlistId = :playlistId AND deletedAt IS NULL
+            GROUP BY name, url
+          )
+        """
+    )
+    suspend fun duplicateIds(playlistId: Long): List<Long>
+
     /** Set the kind (LIVE/VOD/SERIES/UNKNOWN) for every channel matching the current filter. */
     @Query(
         """

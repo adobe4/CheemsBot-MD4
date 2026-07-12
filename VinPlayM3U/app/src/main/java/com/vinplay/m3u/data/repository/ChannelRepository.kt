@@ -169,6 +169,13 @@ class ChannelRepository @Inject constructor(
 
     suspend fun trashIds(playlistId: Long): List<Long> = channelDao.trashIds(playlistId)
 
+    /** Soft-delete duplicate channels (same name + url) across the playlist. Returns removed ids for undo. */
+    suspend fun removeDuplicates(playlistId: Long): List<Long> {
+        val ids = channelDao.duplicateIds(playlistId)
+        if (ids.isNotEmpty()) softDelete(ids, playlistId)
+        return ids
+    }
+
     /** Soft-delete every channel matching the current filter (bulk action). Returns affected ids for undo. */
     suspend fun softDeleteFiltered(playlistId: Long, filter: ChannelFilter): List<Long> {
         val ids = channelDao.idsFiltered(playlistId, filter.query, filter.group, filter.kindName)

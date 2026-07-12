@@ -193,6 +193,18 @@ fun ChannelsScreen(
                                 overflowOpen = false; renamingGroup = g
                             })
                         }
+                        DropdownMenuItem(text = { Text("Remove duplicates") }, onClick = {
+                            overflowOpen = false
+                            viewModel.removeDuplicates { n ->
+                                scope.launch {
+                                    val r = snackbar.showSnackbar(
+                                        if (n == 0) "No duplicates found" else "Removed $n duplicate(s)",
+                                        actionLabel = if (n > 0) "Undo" else null
+                                    )
+                                    if (r == SnackbarResult.ActionPerformed) viewModel.undoDelete()
+                                }
+                            }
+                        })
                         DropdownMenuItem(text = { Text("Find & replace in names") }, onClick = {
                             overflowOpen = false; showFindReplace = true
                         })

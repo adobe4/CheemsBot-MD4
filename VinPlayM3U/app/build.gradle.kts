@@ -11,16 +11,28 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        // Distinct applicationId so this build installs alongside any earlier com.vinplay.m3u
-        // install instead of replacing it. (namespace stays com.vinplay.m3u for the code.)
-        applicationId = "com.vinplay.m3u.pro"
+        // Distinct applicationId so this build installs alongside earlier com.vinplay.m3u.* installs.
+        // (namespace stays com.vinplay.m3u for the code.)
+        applicationId = "com.vinplay.m3u.max"
         minSdk = 24
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.2.0"
+        versionCode = 4
+        versionName = "1.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
+    }
+
+    signingConfigs {
+        // Committed, stable debug key. Without this, every CI run signs with a freshly generated
+        // debug key, so installing a new build over an old one fails with "conflicts with the
+        // existing package" (signature mismatch). A fixed key makes updates install in place.
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
 
     buildTypes {
@@ -34,6 +46,7 @@ android {
         }
         debug {
             applicationIdSuffix = ".debug"
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
