@@ -1,6 +1,7 @@
 package com.vinplay.m3u.ui.playlists
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
@@ -91,6 +93,10 @@ fun PlaylistsScreen(
                         onClick = { onOpenPlaylist(p.id) },
                         onImport = { onImportInto(p.id) },
                         onRename = { editorFor = p },
+                        onDuplicate = {
+                            viewModel.duplicate(p.id)
+                            scope.launch { snackbarHost.showSnackbar("Duplicating \"${p.name}\"…") }
+                        },
                         onDelete = {
                             viewModel.delete(p.id)
                             scope.launch {
@@ -131,16 +137,19 @@ fun PlaylistsScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun PlaylistCard(
     summary: PlaylistSummary,
     onClick: () -> Unit,
     onImport: () -> Unit,
     onRename: () -> Unit,
+    onDuplicate: () -> Unit,
     onDelete: () -> Unit
 ) {
     var menu by remember { mutableStateOf(false) }
-    Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+    // Long-press opens the actions menu (duplicate/rename/delete); tap opens the playlist.
+    Card(modifier = Modifier.fillMaxWidth().combinedClickable(onClick = onClick, onLongClick = { menu = true })) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -165,6 +174,11 @@ private fun PlaylistCard(
                 Icon(Icons.Default.MoreVert, contentDescription = "More")
             }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(
+                    text = { Text("Duplicate") },
+                    leadingIcon = { Icon(Icons.Default.ContentCopy, null) },
+                    onClick = { menu = false; onDuplicate() }
+                )
                 DropdownMenuItem(
                     text = { Text("Rename") },
                     leadingIcon = { Icon(Icons.Default.Edit, null) },

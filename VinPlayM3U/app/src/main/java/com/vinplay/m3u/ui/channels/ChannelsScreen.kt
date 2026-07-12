@@ -122,6 +122,10 @@ fun ChannelsScreen(
     }
     LaunchedEffect(shouldLoadMore) { if (shouldLoadMore) viewModel.loadMore() }
 
+    // Background link-testing updates statuses in the DB; refresh the visible window when a test
+    // run starts and when it finishes (the progress bar covers live counts in between).
+    LaunchedEffect(testProgress.running) { viewModel.refresh() }
+
     Scaffold(
         topBar = {
           if (selectionActive) {

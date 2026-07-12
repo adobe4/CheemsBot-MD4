@@ -7,6 +7,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MediaSource
@@ -92,10 +93,29 @@ class PlayerManager @Inject constructor(
         return DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
     }
 
+    /**
+     * A lean LoadControl: small buffers so live channels start fast and the player stays light on
+     * memory (the default 50s buffer is wasteful for zapping between channels), while still keeping
+     * enough to ride out jitter.
+     */
+    @OptIn(UnstableApi::class)
+    private fun buildLoadControl(): DefaultLoadControl =
+        DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                /* minBufferMs = */ 10_000,
+                /* maxBufferMs = */ 20_000,
+                /* bufferForPlaybackMs = */ 1_500,
+                /* bufferForPlaybackAfterRebufferMs = */ 3_000
+            )
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
+
     /** Returns the shared player, creating it on first use. */
+    @OptIn(UnstableApi::class)
     fun getOrCreate(): ExoPlayer =
         player ?: ExoPlayer.Builder(context)
             .setMediaSourceFactory(buildMediaSourceFactory())
+            .setLoadControl(buildLoadControl())
             .build()
             .also {
                 it.addListener(listener)

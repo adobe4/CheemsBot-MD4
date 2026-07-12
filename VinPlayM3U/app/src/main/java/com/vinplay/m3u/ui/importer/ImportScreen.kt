@@ -1,5 +1,6 @@
 package com.vinplay.m3u.ui.importer
 
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -47,6 +48,7 @@ fun ImportScreen(
     viewModel: ImportViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val ctx = androidx.compose.ui.platform.LocalContext.current
 
     val filePicker = rememberLauncherForActivityResult(
         // Accept any type; many providers report M3U as octet-stream/text.
@@ -111,7 +113,12 @@ fun ImportScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
                     Button(
-                        onClick = { viewModel.importFromUrl(url) },
+                        onClick = {
+                            if (viewModel.importFromUrlInBackground(url)) {
+                                Toast.makeText(ctx, "Importing in background — see the notification", Toast.LENGTH_SHORT).show()
+                                onDone()
+                            }
+                        },
                         enabled = url.isNotBlank(),
                         modifier = Modifier.fillMaxWidth()
                     ) { Text("Download & import") }
@@ -152,7 +159,15 @@ fun ImportScreen(
                         modifier = Modifier.fillMaxWidth().height(140.dp)
                     )
                     Button(
-                        onClick = { viewModel.importBulkLinks(bulk) },
+                        onClick = {
+                            val n = viewModel.importBulkInBackground(bulk)
+                            if (n > 0) {
+                                Toast.makeText(ctx, "Importing $n link(s) in background", Toast.LENGTH_SHORT).show()
+                                onDone()
+                            } else {
+                                Toast.makeText(ctx, "No links found in the text", Toast.LENGTH_SHORT).show()
+                            }
+                        },
                         enabled = bulk.isNotBlank(),
                         modifier = Modifier.fillMaxWidth()
                     ) { Text("Detect & import all") }

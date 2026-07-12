@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vinplay.m3u.data.local.PlaylistSummary
 import com.vinplay.m3u.data.local.entity.PlaylistEntity
+import com.vinplay.m3u.data.repository.ChannelRepository
 import com.vinplay.m3u.data.repository.PlaylistRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -13,7 +14,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class PlaylistsViewModel @Inject constructor(
-    private val repository: PlaylistRepository
+    private val repository: PlaylistRepository,
+    private val channelRepository: ChannelRepository
 ) : ViewModel() {
 
     val playlists = repository.summaries()
@@ -29,6 +31,8 @@ class PlaylistsViewModel @Inject constructor(
     }
 
     fun rename(id: Long, name: String) = viewModelScope.launch { repository.rename(id, name) }
+
+    fun duplicate(id: Long) = viewModelScope.launch { channelRepository.duplicatePlaylist(id) }
 
     fun delete(id: Long) = viewModelScope.launch {
         lastDeleted = repository.get(id)

@@ -6,6 +6,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vinplay.m3u.data.repository.ImportManager
+import com.vinplay.m3u.task.TaskService
 import com.vinplay.m3u.ui.navigation.Destinations
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -45,6 +46,21 @@ class ImportViewModel @Inject constructor(
 
     fun importFromUrl(url: String) = runImport {
         importManager.importFromUrl(playlistId, url.trim(), progress)
+    }
+
+    /** Downloads/imports in the foreground service, so it continues if the app is closed. */
+    fun importFromUrlInBackground(url: String): Boolean {
+        val link = url.trim()
+        if (!link.startsWith("http", ignoreCase = true)) return false
+        TaskService.startImport(context, playlistId, listOf(link))
+        return true
+    }
+
+    /** Detects all links in the text and imports them via the background service. */
+    fun importBulkInBackground(text: String): Int {
+        val links = extractLinks(text)
+        if (links.isNotEmpty()) TaskService.startImport(context, playlistId, links)
+        return links.size
     }
 
     fun importFromText(text: String) = runImport {

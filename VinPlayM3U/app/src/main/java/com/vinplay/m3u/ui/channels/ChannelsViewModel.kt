@@ -12,6 +12,7 @@ import com.vinplay.m3u.data.repository.ChannelFilter
 import com.vinplay.m3u.data.repository.ChannelRepository
 import com.vinplay.m3u.data.repository.ExportManager
 import com.vinplay.m3u.data.repository.PlaylistRepository
+import com.vinplay.m3u.task.TaskService
 import com.vinplay.m3u.ui.navigation.Destinations
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -123,6 +124,9 @@ class ChannelsViewModel @Inject constructor(
             )
         }
     }
+
+    /** Re-query the currently loaded window (used after background test updates statuses). */
+    fun refresh() = reload(reset = false)
 
     fun loadMore() {
         if (_ui.value.loading || _ui.value.endReached) return
@@ -269,9 +273,9 @@ class ChannelsViewModel @Inject constructor(
 
     // ---- Bulk test ----
 
-    fun testAllFiltered() = viewModelScope.launch {
-        channelRepository.testFiltered(playlistId, _ui.value.filter)
-        reload(reset = false)
+    /** Runs in the foreground service so it survives leaving the screen and shows a notification. */
+    fun testAllFiltered() {
+        TaskService.startTest(context, playlistId, _ui.value.filter)
     }
 
     // ---- Export ----

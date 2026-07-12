@@ -121,6 +121,18 @@ interface ChannelDao {
     @Query("UPDATE channels SET playlistId = :targetPlaylistId WHERE id IN (:ids)")
     suspend fun moveToPlaylistBulk(ids: List<Long>, targetPlaylistId: Long)
 
+    /** Copy every active channel of one playlist into another via INSERT-SELECT (no row loaded into RAM). */
+    @Query(
+        """
+        INSERT INTO channels (playlistId, name, url, groupTitle, tvgId, tvgLogo, tvgName, kind,
+                              userAgent, referrer, orderIndex, testStatus, testStatusCode, testCheckedAt, deletedAt)
+        SELECT :newPlaylistId, name, url, groupTitle, tvgId, tvgLogo, tvgName, kind,
+               userAgent, referrer, orderIndex, testStatus, testStatusCode, testCheckedAt, deletedAt
+        FROM channels WHERE playlistId = :srcPlaylistId AND deletedAt IS NULL
+        """
+    )
+    suspend fun copyChannelsToPlaylist(srcPlaylistId: Long, newPlaylistId: Long)
+
     @Query("UPDATE channels SET orderIndex = :orderIndex WHERE id = :id")
     suspend fun setOrderIndex(id: Long, orderIndex: Long)
 

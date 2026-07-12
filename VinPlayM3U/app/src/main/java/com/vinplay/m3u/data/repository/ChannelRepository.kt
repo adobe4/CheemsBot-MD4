@@ -81,6 +81,15 @@ class ChannelRepository @Inject constructor(
         playlistRepository.touch(sourcePlaylistId)
     }
 
+    /** Duplicate a whole playlist (shell + all active channels) into a new "… (copy)" playlist. */
+    suspend fun duplicatePlaylist(srcPlaylistId: Long): Long {
+        val src = playlistRepository.get(srcPlaylistId) ?: return -1L
+        val newId = playlistRepository.create("${src.name} (copy)")
+        channelDao.copyChannelsToPlaylist(srcPlaylistId, newId)
+        playlistRepository.touch(newId)
+        return newId
+    }
+
     /** Duplicate the given channels into another playlist, keeping the originals. */
     suspend fun copyManyToPlaylist(ids: List<Long>, targetPlaylistId: Long) {
         if (ids.isEmpty()) return
