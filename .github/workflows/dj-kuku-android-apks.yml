@@ -1,0 +1,58 @@
+name: Build DJ Kuku Android APKs
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'android-dj-kuku/**'
+      - '.github/workflows/dj-kuku-android-apks.yml'
+
+jobs:
+  build-apks:
+    name: Build listener and admin debug APKs
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android-dj-kuku
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Restore Firebase config files from secrets
+        env:
+          DJ_KUKU_USER_GOOGLE_SERVICES_JSON: ${{ secrets.DJ_KUKU_USER_GOOGLE_SERVICES_JSON }}
+          DJ_KUKU_ADMIN_GOOGLE_SERVICES_JSON: ${{ secrets.DJ_KUKU_ADMIN_GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$DJ_KUKU_USER_GOOGLE_SERVICES_JSON" ] || [ -z "$DJ_KUKU_ADMIN_GOOGLE_SERVICES_JSON" ]; then
+            echo "Missing Firebase secrets. Add DJ_KUKU_USER_GOOGLE_SERVICES_JSON and DJ_KUKU_ADMIN_GOOGLE_SERVICES_JSON."
+            exit 1
+          fi
+          printf '%s' "$DJ_KUKU_USER_GOOGLE_SERVICES_JSON" > app-user/google-services.json
+          printf '%s' "$DJ_KUKU_ADMIN_GOOGLE_SERVICES_JSON" > app-admin/google-services.json
+
+      - name: Build APKs
+        run: gradle :app-user:assembleDebug :app-admin:assembleDebug --no-daemon
+
+      - name: Upload listener APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: dj-kuku-listener-debug-apk
+          path: android-dj-kuku/app-user/build/outputs/apk/debug/app-user-debug.apk
+
+      - name: Upload admin APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: dj-kuku-admin-debug-apk
+          path: android-dj-kuku/app-admin/build/outputs/apk/debug/app-admin-debug.apk
