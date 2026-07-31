@@ -42,6 +42,7 @@ fun EditChannelDialog(
     var url by remember { mutableStateOf(channel.url) }
     var group by remember { mutableStateOf(channel.groupTitle) }
     var kind by remember { mutableStateOf(channel.kind) }
+    var logo by remember { mutableStateOf(channel.tvgLogo ?: "") }
     var userAgent by remember { mutableStateOf(channel.userAgent ?: "") }
     var referrer by remember { mutableStateOf(channel.referrer ?: "") }
 
@@ -65,6 +66,7 @@ fun EditChannelDialog(
                         FilterChip(selected = kind == k, onClick = { kind = k }, label = { Text(k.name) })
                     }
                 }
+                OutlinedTextField(logo, { logo = it }, label = { Text("Logo URL (tvg-logo)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(userAgent, { userAgent = it }, label = { Text("User-Agent (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(referrer, { referrer = it }, label = { Text("Referer (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             }
@@ -79,6 +81,7 @@ fun EditChannelDialog(
                             url = url.trim(),
                             groupTitle = group.trim(),
                             kind = kind,
+                            tvgLogo = logo.trim().ifBlank { null },
                             userAgent = userAgent.trim().ifBlank { null },
                             referrer = referrer.trim().ifBlank { null }
                         )

@@ -6,6 +6,9 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -29,6 +32,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -57,11 +61,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
 import com.vinplay.m3u.data.local.entity.ChannelEntity
 import com.vinplay.m3u.data.model.ChannelKind
 import com.vinplay.m3u.data.model.TestStatus
@@ -493,7 +500,7 @@ private fun ChannelRow(
                 tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
-            StatusDot(color = statusColor(channel.testStatus))
+            LogoThumb(logo = channel.tvgLogo, status = channel.testStatus)
         }
         Column(Modifier.weight(1f).padding(start = 12.dp)) {
             Text(channel.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -524,6 +531,33 @@ private fun ChannelRow(
                 DropdownMenuItem(text = { Text("Delete") }, onClick = { menu = false; onDelete() })
             }
         }
+    }
+}
+
+/** Channel logo thumbnail (tvg-logo) with the link-test status shown as a small corner dot. */
+@Composable
+private fun LogoThumb(logo: String?, status: TestStatus) {
+    Box(Modifier.size(44.dp)) {
+        val shape = RoundedCornerShape(8.dp)
+        if (logo.isNullOrBlank()) {
+            Box(
+                Modifier.matchParentSize().clip(shape).background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Tv, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        } else {
+            AsyncImage(
+                model = logo,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.matchParentSize().clip(shape).background(MaterialTheme.colorScheme.surfaceVariant)
+            )
+        }
+        StatusDot(
+            color = statusColor(status),
+            modifier = Modifier.align(Alignment.BottomEnd)
+        )
     }
 }
 
