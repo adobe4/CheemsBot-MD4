@@ -37,6 +37,21 @@ class ChannelRepository @Inject constructor(
 
     suspend fun get(id: Long): ChannelEntity? = channelDao.getById(id)
 
+    // ---- Global (all playlists) reads ----
+
+    suspend fun pageGlobal(filter: ChannelFilter, limit: Int, offset: Int): List<ChannelEntity> =
+        channelDao.pageGlobal(filter.query, filter.kindName, limit, offset)
+
+    fun globalCount(filter: ChannelFilter): Flow<Int> =
+        channelDao.observeGlobalCount(filter.query, filter.kindName)
+
+    /** Move channels from anywhere into a target playlist (used by the All-Channels hub). */
+    suspend fun moveManyToPlaylistGlobal(ids: List<Long>, targetPlaylistId: Long) {
+        if (ids.isEmpty()) return
+        channelDao.moveToPlaylistBulk(ids, targetPlaylistId)
+        playlistRepository.touch(targetPlaylistId)
+    }
+
     fun trashCount(playlistId: Long): Flow<Int> = channelDao.observeTrashCount(playlistId)
 
     suspend fun trashPage(playlistId: Long, limit: Int, offset: Int): List<ChannelEntity> =
@@ -191,12 +206,19 @@ class ChannelRepository @Inject constructor(
     private val _testProgress = MutableStateFlow(TestProgress(0, 0, false))
     val testProgress: StateFlow<TestProgress> = _testProgress.asStateFlow()
 
+    /** HTTP-test every channel matching [filter] in a playlist (fast, parallel). */
+    suspend fun testFiltered(playlistId: Long, filter: ChannelFilter, concurrency: Int = 10) =
+        runHttpTest(channelDao.idsFiltered(playlistId, filter.query, filter.group, filter.kindName), concurrency)
+
+    /** HTTP-test every channel matching [filter] across all playlists (All-Channels hub). */
+    suspend fun testGlobalFiltered(filter: ChannelFilter, concurrency: Int = 10) =
+        runHttpTest(channelDao.idsGlobal(filter.query, filter.kindName), concurrency)
+
     /**
-     * Test every channel matching [filter]. Runs up to [concurrency] probes at once via a
-     * semaphore; results are written back per-channel so the UI reflects them live.
+     * Runs up to [concurrency] HTTP probes at once via a semaphore; results are written back
+     * per-channel so the UI reflects them live.
      */
-    suspend fun testFiltered(playlistId: Long, filter: ChannelFilter, concurrency: Int = 10) {
-        val ids = channelDao.idsFiltered(playlistId, filter.query, filter.group, filter.kindName)
+    private suspend fun runHttpTest(ids: List<Long>, concurrency: Int) {
         if (ids.isEmpty()) return
         val semaphore = Semaphore(concurrency)
         _testProgress.value = TestProgress(0, ids.size, true)
@@ -217,5 +239,38 @@ class ChannelRepository @Inject constructor(
             }
         }
         _testProgress.value = TestProgress(done.get(), ids.size, false)
+    }
+
+    // ---- Deep playback test (detects streams that start then freeze -> UNSTABLE) ----
+
+    suspend fun playbackTestFiltered(
+        playlistId: Long,
+        filter: ChannelFilter,
+        check: suspend (ChannelEntity) -> TestStatus
+    ) = runPlaybackTest(channelDao.idsFiltered(playlistId, filter.query, filter.group, filter.kindName), check)
+
+    suspend fun playbackTestGlobal(
+        filter: ChannelFilter,
+        check: suspend (ChannelEntity) -> TestStatus
+    ) = runPlaybackTest(channelDao.idsGlobal(filter.query, filter.kindName), check)
+
+    /**
+     * Sequentially opens each stream (via [check], which actually decodes a few seconds) and
+     * records OK / UNSTABLE / DEAD. Slow by nature — one stream at a time — so it's a separate
+     * opt-in from the fast HTTP test.
+     */
+    private suspend fun runPlaybackTest(ids: List<Long>, check: suspend (ChannelEntity) -> TestStatus) {
+        if (ids.isEmpty()) return
+        _testProgress.value = TestProgress(0, ids.size, true)
+        var done = 0
+        for (id in ids) {
+            val channel = channelDao.getById(id) ?: continue
+            channelDao.markStatus(listOf(id), TestStatus.TESTING)
+            val status = runCatching { check(channel) }.getOrDefault(TestStatus.ERROR)
+            channelDao.updateTestResult(id, status, null, System.currentTimeMillis())
+            done++
+            _testProgress.value = TestProgress(done, ids.size, true)
+        }
+        _testProgress.value = TestProgress(done, ids.size, false)
     }
 }

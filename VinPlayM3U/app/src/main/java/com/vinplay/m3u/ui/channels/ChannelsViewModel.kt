@@ -12,6 +12,7 @@ import com.vinplay.m3u.data.repository.ChannelFilter
 import com.vinplay.m3u.data.repository.ChannelRepository
 import com.vinplay.m3u.data.repository.ExportManager
 import com.vinplay.m3u.data.repository.PlaylistRepository
+import com.vinplay.m3u.player.PlaybackController
 import com.vinplay.m3u.task.TaskService
 import com.vinplay.m3u.ui.navigation.Destinations
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -31,8 +32,12 @@ class ChannelsViewModel @Inject constructor(
     private val channelRepository: ChannelRepository,
     private val playlistRepository: PlaylistRepository,
     private val exportManager: ExportManager,
+    private val playbackController: PlaybackController,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
+
+    /** Play a channel in the app-level mini player (stays up while browsing). */
+    fun play(channel: ChannelEntity) = playbackController.play(channel)
 
     companion object {
         const val PAGE_FIRST = 200
@@ -283,6 +288,11 @@ class ChannelsViewModel @Inject constructor(
     /** Runs in the foreground service so it survives leaving the screen and shows a notification. */
     fun testAllFiltered() {
         TaskService.startTest(context, playlistId, _ui.value.filter)
+    }
+
+    /** Deep (playback) test — detects streams that start then freeze and marks them yellow. */
+    fun deepTestFiltered() {
+        TaskService.startPlaybackTest(context, playlistId, _ui.value.filter)
     }
 
     // ---- Export ----

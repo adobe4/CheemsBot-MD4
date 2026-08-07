@@ -3,6 +3,7 @@ package com.vinplay.m3u.ui.navigation
 /** Central route table. Argument keys are kept next to their builders to avoid drift. */
 object Destinations {
     const val PLAYLISTS = "playlists"
+    const val ALL_CHANNELS = "allChannels"
 
     const val ARG_PLAYLIST_ID = "playlistId"
     const val ARG_CHANNEL_ID = "channelId"

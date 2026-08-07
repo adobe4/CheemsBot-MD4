@@ -4,9 +4,10 @@ package com.vinplay.m3u.data.model
 enum class TestStatus {
     UNTESTED,
     TESTING,
-    OK,       // 2xx / playable
+    OK,       // reachable / plays cleanly (green)
+    UNSTABLE, // plays then freezes/rebuffers within a few seconds (yellow)
     REDIRECT, // 3xx
-    DEAD,     // 4xx / 5xx
+    DEAD,     // 4xx / 5xx / unreachable (red)
     TIMEOUT,
     ERROR
 }

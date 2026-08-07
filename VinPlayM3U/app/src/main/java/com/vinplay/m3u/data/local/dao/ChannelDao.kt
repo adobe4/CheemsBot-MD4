@@ -88,6 +88,41 @@ interface ChannelDao {
     @Query("SELECT DISTINCT groupTitle FROM channels WHERE playlistId = :playlistId AND deletedAt IS NULL ORDER BY groupTitle ASC")
     fun observeGroups(playlistId: Long): Flow<List<String>>
 
+    // ---- Global (all playlists) ----
+
+    @Query(
+        """
+        SELECT * FROM channels
+        WHERE deletedAt IS NULL
+          AND (:kind IS NULL OR kind = :kind)
+          AND (:query = '' OR name LIKE '%' || :query || '%')
+        ORDER BY name COLLATE NOCASE ASC, id ASC
+        LIMIT :limit OFFSET :offset
+        """
+    )
+    suspend fun pageGlobal(query: String, kind: String?, limit: Int, offset: Int): List<ChannelEntity>
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM channels
+        WHERE deletedAt IS NULL
+          AND (:kind IS NULL OR kind = :kind)
+          AND (:query = '' OR name LIKE '%' || :query || '%')
+        """
+    )
+    fun observeGlobalCount(query: String, kind: String?): Flow<Int>
+
+    @Query(
+        """
+        SELECT id FROM channels
+        WHERE deletedAt IS NULL
+          AND (:kind IS NULL OR kind = :kind)
+          AND (:query = '' OR name LIKE '%' || :query || '%')
+        ORDER BY name COLLATE NOCASE ASC, id ASC
+        """
+    )
+    suspend fun idsGlobal(query: String, kind: String?): List<Long>
+
     @Query("SELECT * FROM channels WHERE id = :id")
     suspend fun getById(id: Long): ChannelEntity?
 

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentCopy
@@ -54,6 +55,7 @@ import kotlinx.coroutines.launch
 fun PlaylistsScreen(
     onOpenPlaylist: (Long) -> Unit,
     onImportInto: (Long) -> Unit,
+    onOpenAllChannels: () -> Unit,
     viewModel: PlaylistsViewModel = hiltViewModel()
 ) {
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
@@ -64,7 +66,16 @@ fun PlaylistsScreen(
     var showCreate by remember { mutableStateOf(false) }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Vin Play M3U") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Vin Play M3U") },
+                actions = {
+                    IconButton(onClick = onOpenAllChannels) {
+                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = "All channels")
+                    }
+                }
+            )
+        },
         snackbarHost = { SnackbarHost(snackbarHost) },
         floatingActionButton = {
             ExtendedFloatingActionButton(

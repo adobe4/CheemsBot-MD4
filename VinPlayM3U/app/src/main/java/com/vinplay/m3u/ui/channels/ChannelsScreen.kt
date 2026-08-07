@@ -74,7 +74,7 @@ import com.vinplay.m3u.data.model.ChannelKind
 import com.vinplay.m3u.data.model.TestStatus
 import com.vinplay.m3u.ui.components.EmptyState
 import com.vinplay.m3u.ui.components.LoadingSkeleton
-import com.vinplay.m3u.ui.components.StatusDot
+import com.vinplay.m3u.ui.components.LogoThumb
 import com.vinplay.m3u.ui.playlists.TextPromptDialog
 import kotlinx.coroutines.launch
 
@@ -84,7 +84,6 @@ fun ChannelsScreen(
     onBack: () -> Unit,
     onImport: (Long) -> Unit,
     onOpenTrash: (Long) -> Unit,
-    onPlay: (Long) -> Unit,
     viewModel: ChannelsViewModel = hiltViewModel()
 ) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
@@ -187,6 +186,9 @@ fun ChannelsScreen(
                         DropdownMenuItem(text = { Text("Test all (filtered)") }, onClick = {
                             overflowOpen = false; viewModel.testAllFiltered()
                         })
+                        DropdownMenuItem(text = { Text("Deep test — freeze check (yellow)") }, onClick = {
+                            overflowOpen = false; viewModel.deepTestFiltered()
+                        })
                         DropdownMenuItem(text = { Text("Delete all (filtered)") }, onClick = {
                             overflowOpen = false
                             viewModel.deleteFiltered()
@@ -280,7 +282,7 @@ fun ChannelsScreen(
                             onMoveUp = { viewModel.reorder(index, index - 1) },
                             onMoveDown = { viewModel.reorder(index, index + 1) },
                             onClick = {
-                                if (selectionActive) viewModel.toggleSelect(channel.id) else onPlay(channel.id)
+                                if (selectionActive) viewModel.toggleSelect(channel.id) else viewModel.play(channel)
                             },
                             onLongClick = { viewModel.toggleSelect(channel.id) },
                             onEdit = { editing = channel },
@@ -534,40 +536,3 @@ private fun ChannelRow(
     }
 }
 
-/** Channel logo thumbnail (tvg-logo) with the link-test status shown as a small corner dot. */
-@Composable
-private fun LogoThumb(logo: String?, status: TestStatus) {
-    Box(Modifier.size(44.dp)) {
-        val shape = RoundedCornerShape(8.dp)
-        if (logo.isNullOrBlank()) {
-            Box(
-                Modifier.matchParentSize().clip(shape).background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.Tv, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        } else {
-            AsyncImage(
-                model = logo,
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.matchParentSize().clip(shape).background(MaterialTheme.colorScheme.surfaceVariant)
-            )
-        }
-        StatusDot(
-            color = statusColor(status),
-            modifier = Modifier.align(Alignment.BottomEnd)
-        )
-    }
-}
-
-@Composable
-private fun statusColor(status: TestStatus): Color = when (status) {
-    TestStatus.OK -> Color(0xFF3FBF6A)
-    TestStatus.REDIRECT -> Color(0xFFE0B036)
-    TestStatus.DEAD -> Color(0xFFE0483B)
-    TestStatus.TIMEOUT -> Color(0xFFE07A3B)
-    TestStatus.ERROR -> Color(0xFFB0483B)
-    TestStatus.TESTING -> MaterialTheme.colorScheme.primary
-    TestStatus.UNTESTED -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-}

@@ -35,6 +35,7 @@ class TaskService : Service() {
 
     @Inject lateinit var importManager: ImportManager
     @Inject lateinit var channelRepository: ChannelRepository
+    @Inject lateinit var healthChecker: com.vinplay.m3u.player.PlaybackHealthChecker
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val active = AtomicInteger(0)
@@ -52,15 +53,8 @@ class TaskService : Service() {
                 val links = intent.getStringArrayListExtra(EXTRA_LINKS) ?: arrayListOf()
                 runImport(playlistId, links, startId)
             }
-            ACTION_TEST -> {
-                val playlistId = intent.getLongExtra(EXTRA_PLAYLIST_ID, 0L)
-                val filter = ChannelFilter(
-                    query = intent.getStringExtra(EXTRA_QUERY) ?: "",
-                    group = intent.getStringExtra(EXTRA_GROUP),
-                    kind = intent.getStringExtra(EXTRA_KIND)?.let { runCatching { enumValueOf<com.vinplay.m3u.data.model.ChannelKind>(it) }.getOrNull() }
-                )
-                runTest(playlistId, filter, startId)
-            }
+            ACTION_TEST -> runTest(intent.getLongExtra(EXTRA_PLAYLIST_ID, 0L), filterFrom(intent), intent.getBooleanExtra(EXTRA_GLOBAL, false), startId)
+            ACTION_PLAYBACK_TEST -> runPlaybackTest(intent.getLongExtra(EXTRA_PLAYLIST_ID, 0L), filterFrom(intent), intent.getBooleanExtra(EXTRA_GLOBAL, false), startId)
             else -> finish(startId)
         }
         return START_NOT_STICKY
@@ -88,7 +82,13 @@ class TaskService : Service() {
         }
     }
 
-    private fun runTest(playlistId: Long, filter: ChannelFilter, startId: Int) {
+    private fun filterFrom(intent: Intent) = ChannelFilter(
+        query = intent.getStringExtra(EXTRA_QUERY) ?: "",
+        group = intent.getStringExtra(EXTRA_GROUP),
+        kind = intent.getStringExtra(EXTRA_KIND)?.let { runCatching { enumValueOf<com.vinplay.m3u.data.model.ChannelKind>(it) }.getOrNull() }
+    )
+
+    private fun runTest(playlistId: Long, filter: ChannelFilter, global: Boolean, startId: Int) {
         scope.launch {
             val progressJob = launch {
                 channelRepository.testProgress.collect { p ->
@@ -97,10 +97,30 @@ class TaskService : Service() {
                     }
                 }
             }
-            channelRepository.testFiltered(playlistId, filter)
+            if (global) channelRepository.testGlobalFiltered(filter) else channelRepository.testFiltered(playlistId, filter)
             progressJob.cancel()
             val done = channelRepository.testProgress.value
             notifyDone("Link test complete", "Tested ${done.total} channels")
+            finish(startId)
+        }
+    }
+
+    private fun runPlaybackTest(playlistId: Long, filter: ChannelFilter, global: Boolean, startId: Int) {
+        scope.launch {
+            val progressJob = launch {
+                channelRepository.testProgress.collect { p ->
+                    if (p.running && p.total > 0) {
+                        postProgress(buildProgress("Deep testing (playback)…", "${p.done}/${p.total}", p.done, p.total, indeterminate = false))
+                    }
+                }
+            }
+            val check: suspend (com.vinplay.m3u.data.local.entity.ChannelEntity) -> com.vinplay.m3u.data.model.TestStatus =
+                { ch -> healthChecker.check(ch.url, ch.userAgent, ch.referrer) }
+            if (global) channelRepository.playbackTestGlobal(filter, check)
+            else channelRepository.playbackTestFiltered(playlistId, filter, check)
+            progressJob.cancel()
+            val done = channelRepository.testProgress.value
+            notifyDone("Deep test complete", "Checked ${done.total} channels")
             finish(startId)
         }
     }
@@ -167,11 +187,13 @@ class TaskService : Service() {
     companion object {
         const val ACTION_IMPORT = "com.vinplay.m3u.action.IMPORT"
         const val ACTION_TEST = "com.vinplay.m3u.action.TEST"
+        const val ACTION_PLAYBACK_TEST = "com.vinplay.m3u.action.PLAYBACK_TEST"
         private const val EXTRA_PLAYLIST_ID = "playlistId"
         private const val EXTRA_LINKS = "links"
         private const val EXTRA_QUERY = "query"
         private const val EXTRA_GROUP = "group"
         private const val EXTRA_KIND = "kind"
+        private const val EXTRA_GLOBAL = "global"
 
         private const val CHANNEL_ID = "vinplay_tasks"
         private const val NOTIFICATION_ID = 1001
@@ -186,13 +208,26 @@ class TaskService : Service() {
             androidx.core.content.ContextCompat.startForegroundService(context, intent)
         }
 
-        fun startTest(context: Context, playlistId: Long, filter: ChannelFilter) {
+        fun startTest(context: Context, playlistId: Long, filter: ChannelFilter) =
+            start(context, ACTION_TEST, playlistId, filter, global = false)
+
+        fun startTestGlobal(context: Context, filter: ChannelFilter) =
+            start(context, ACTION_TEST, 0L, filter, global = true)
+
+        fun startPlaybackTest(context: Context, playlistId: Long, filter: ChannelFilter) =
+            start(context, ACTION_PLAYBACK_TEST, playlistId, filter, global = false)
+
+        fun startPlaybackTestGlobal(context: Context, filter: ChannelFilter) =
+            start(context, ACTION_PLAYBACK_TEST, 0L, filter, global = true)
+
+        private fun start(context: Context, action: String, playlistId: Long, filter: ChannelFilter, global: Boolean) {
             val intent = Intent(context, TaskService::class.java).apply {
-                action = ACTION_TEST
+                this.action = action
                 putExtra(EXTRA_PLAYLIST_ID, playlistId)
                 putExtra(EXTRA_QUERY, filter.query)
                 putExtra(EXTRA_GROUP, filter.group)
                 putExtra(EXTRA_KIND, filter.kindName)
+                putExtra(EXTRA_GLOBAL, global)
             }
             androidx.core.content.ContextCompat.startForegroundService(context, intent)
         }
