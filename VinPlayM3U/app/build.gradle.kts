@@ -11,16 +11,31 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        // Distinct applicationId so this build installs alongside earlier com.vinplay.m3u.* installs.
+        // applicationId is set per product flavor below so the flavors install side by side.
         // (namespace stays com.vinplay.m3u for the code.)
-        applicationId = "com.vinplay.m3u.max"
         minSdk = 24
         targetSdk = 35
-        versionCode = 6
-        versionName = "1.4.0"
+        versionCode = 7
+        versionName = "1.4.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
+    }
+
+    flavorDimensions += "brand"
+    productFlavors {
+        // Original build — violet/teal, Material You dynamic color on Android 12+.
+        create("max") {
+            dimension = "brand"
+            applicationId = "com.vinplay.m3u.max"
+            buildConfigField("boolean", "DYNAMIC_COLOR", "true")
+        }
+        // Red clone — installs alongside "max"; forces the red brand palette (no dynamic color).
+        create("red") {
+            dimension = "brand"
+            applicationId = "com.vinplay.m3u.red"
+            buildConfigField("boolean", "DYNAMIC_COLOR", "false")
+        }
     }
 
     signingConfigs {

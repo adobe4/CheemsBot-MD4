@@ -36,13 +36,13 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      - name: Assemble debug + run unit tests
-        run: ./gradlew :app:assembleDebug testDebugUnitTest --stacktrace
+      - name: Assemble debug (max + red) + run unit tests
+        run: ./gradlew :app:assembleDebug :app:testMaxDebugUnitTest :app:testRedDebugUnitTest --stacktrace
 
-      - name: Upload debug APK
+      - name: Upload debug APKs (max + red flavors)
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: vin-play-m3u-debug-apk
-          path: VinPlayM3U/app/build/outputs/apk/debug/*.apk
+          path: VinPlayM3U/app/build/outputs/apk/**/debug/*.apk
           if-no-files-found: warn

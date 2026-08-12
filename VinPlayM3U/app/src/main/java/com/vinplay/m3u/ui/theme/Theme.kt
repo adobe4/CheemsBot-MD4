@@ -9,12 +9,14 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+import com.vinplay.m3u.BuildConfig
 
+// Accent colors come from the per-flavor BrandPalette (max = violet/teal, red = red).
 private val DarkColors = darkColorScheme(
-    primary = Violet40,
+    primary = BrandPalette.primary,
     onPrimary = OnSurfaceHigh,
-    primaryContainer = VioletContainerDark,
-    secondary = Teal40,
+    primaryContainer = BrandPalette.primaryContainer,
+    secondary = BrandPalette.secondary,
     background = Surface0,
     surface = Surface1,
     surfaceVariant = Surface2,
@@ -24,18 +26,19 @@ private val DarkColors = darkColorScheme(
 )
 
 private val LightColors = lightColorScheme(
-    primary = Violet40,
-    secondary = Teal40
+    primary = BrandPalette.primary,
+    secondary = BrandPalette.secondary
 )
 
 /**
  * App theme. Dark by default; when [dynamicColor] is on and the device supports Material You
- * (Android 12+), it adopts the wallpaper-derived scheme instead of the brand palette.
+ * (Android 12+), it adopts the wallpaper-derived scheme instead of the brand palette. The default
+ * comes from the product flavor: the "red" clone disables it so its red palette always shows.
  */
 @Composable
 fun VinPlayTheme(
     darkTheme: Boolean = true,
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = BuildConfig.DYNAMIC_COLOR,
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current

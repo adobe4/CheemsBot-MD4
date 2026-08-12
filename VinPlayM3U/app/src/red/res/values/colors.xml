@@ -1,0 +1,4 @@
+<resources>
+    <!-- Red clone launcher icon background (overrides the main dark navy). -->
+    <color name="ic_launcher_background">#200B0E</color>
+</resources>
