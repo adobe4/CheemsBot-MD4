@@ -13,6 +13,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.Link
@@ -58,6 +59,9 @@ fun ImportScreen(
     var url by remember { mutableStateOf("") }
     var pasted by remember { mutableStateOf("") }
     var bulk by remember { mutableStateOf("") }
+    var xtServer by remember { mutableStateOf("") }
+    var xtUser by remember { mutableStateOf("") }
+    var xtPass by remember { mutableStateOf("") }
 
     Scaffold(
         topBar = {
@@ -125,6 +129,45 @@ fun ImportScreen(
                 }
             }
 
+            // Xtream Codes account
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SectionHeader(Icons.Default.AccountCircle, "Xtream Codes login")
+                    Text(
+                        "Enter the server, username and password from your provider's panel. " +
+                            "You can also paste a full get.php link into the server field and leave the rest blank.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value = xtServer,
+                        onValueChange = { xtServer = it },
+                        singleLine = true,
+                        label = { Text("http://example.com:8080") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = xtUser,
+                        onValueChange = { xtUser = it },
+                        singleLine = true,
+                        label = { Text("Username") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = xtPass,
+                        onValueChange = { xtPass = it },
+                        singleLine = true,
+                        label = { Text("Password") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Button(
+                        onClick = { viewModel.importXtream(xtServer, xtUser, xtPass) },
+                        enabled = xtServer.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Connect & import") }
+                }
+            }
+
             // Pasted text
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -181,6 +224,11 @@ fun ImportScreen(
         is ImportViewModel.ImportState.Success -> ResultDialog(
             title = "Import complete",
             message = "Imported ${s.imported} channels.",
+            onDismiss = { viewModel.reset(); onDone() }
+        )
+        is ImportViewModel.ImportState.Started -> ResultDialog(
+            title = "Import started",
+            message = s.message,
             onDismiss = { viewModel.reset(); onDone() }
         )
         is ImportViewModel.ImportState.Failure -> ResultDialog(

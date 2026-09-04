@@ -65,19 +65,27 @@ class TaskService : Service() {
         scope.launch {
             var total = 0
             var failures = 0
+            var firstError: String? = null
             links.forEachIndexed { index, link ->
                 val note = if (links.size > 1) "Source ${index + 1}/${links.size}" else null
                 runCatching {
                     importManager.importFromUrl(playlistId, link) { imported ->
                         postProgress(buildProgress("Importing channels…", note, total + imported, 0, indeterminate = true))
                     }
-                }.onSuccess { total += it }.onFailure { failures++ }
+                }.onSuccess { total += it }.onFailure {
+                    failures++
+                    if (firstError == null) firstError = it.message
+                }
             }
             val summary = buildString {
                 append("Imported ").append("%,d".format(total)).append(" channels")
-                if (failures > 0) append(" · $failures link(s) failed")
+                if (failures > 0) {
+                    append(" · $failures link(s) failed")
+                    // Surface why, otherwise a rejected/expired IPTV line just looks like "0 channels".
+                    firstError?.let { append(": ").append(it.take(200)) }
+                }
             }
-            notifyDone("Import complete", summary)
+            notifyDone(if (total == 0 && failures > 0) "Import failed" else "Import complete", summary)
             finish(startId)
         }
     }

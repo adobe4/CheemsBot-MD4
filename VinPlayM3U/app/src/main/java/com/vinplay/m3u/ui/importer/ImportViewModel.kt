@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.vinplay.m3u.data.net.XtreamClient
 import com.vinplay.m3u.data.repository.ImportManager
 import com.vinplay.m3u.task.TaskService
 import com.vinplay.m3u.ui.navigation.Destinations
@@ -19,6 +20,7 @@ import javax.inject.Inject
 class ImportViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val importManager: ImportManager,
+    private val xtreamClient: XtreamClient,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -29,6 +31,8 @@ class ImportViewModel @Inject constructor(
         data class Running(val imported: Int, val note: String? = null) : ImportState
         data class Success(val imported: Int) : ImportState
         data class Failure(val message: String) : ImportState
+        /** Handed off to the background service; the screen closes on dismiss. */
+        data class Started(val message: String) : ImportState
     }
 
     private val _state = MutableStateFlow<ImportState>(ImportState.Idle)
@@ -54,6 +58,42 @@ class ImportViewModel @Inject constructor(
         if (!link.startsWith("http", ignoreCase = true)) return false
         TaskService.startImport(context, playlistId, listOf(link))
         return true
+    }
+
+    /**
+     * Xtream Codes login. Verifies the account against `player_api.php` first so a wrong host,
+     * bad password or expired line is reported plainly, then imports the line's `get.php` M3U
+     * through the normal background importer.
+     */
+    fun importXtream(server: String, username: String, password: String) {
+        val base = XtreamClient.normalizeBase(server)
+        if (base == null) {
+            _state.value = ImportState.Failure("Enter a valid server address, e.g. http://example.com:8080")
+            return
+        }
+        // Allow pasting a full get.php/player_api URL into the server field alone.
+        var user = username.trim()
+        var pass = password.trim()
+        if (user.isBlank() || pass.isBlank()) {
+            XtreamClient.extractCredentials(server)?.let { (u, p) -> user = u; pass = p }
+        }
+        if (user.isBlank() || pass.isBlank()) {
+            _state.value = ImportState.Failure("Username and password are required.")
+            return
+        }
+
+        _state.value = ImportState.Running(0, "Checking Xtream account…")
+        viewModelScope.launch {
+            val problem = xtreamClient.probe(base, user, pass)
+            if (problem != null) {
+                _state.value = ImportState.Failure(problem)
+                return@launch
+            }
+            TaskService.startImport(context, playlistId, listOf(XtreamClient.m3uUrl(base, user, pass)))
+            _state.value = ImportState.Started(
+                "Account verified. Importing in the background — watch the notification for progress."
+            )
+        }
     }
 
     /** Detects all links in the text and imports them via the background service. */
