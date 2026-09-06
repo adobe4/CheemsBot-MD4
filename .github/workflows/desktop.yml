@@ -17,24 +17,34 @@ jobs:
   compile:
     name: Compile (fast check)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: VinPlayDesktop
     steps:
-      # Only the desktop folder: the repo also holds the WhatsApp bot, which contains
-      # 'XeonMedia/audio/?.mp3' — '?' is an illegal filename on Windows and fails checkout.
       - uses: actions/checkout@v4
+
+      # The Windows job cannot run `git checkout` on this repo at all: it also holds the WhatsApp
+      # bot, which contains 'XeonMedia/audio/?.mp3', and '?' is an illegal filename on Windows.
+      # Git validates every path in the tree before applying sparse-checkout rules, so the checkout
+      # fails outright. Passing the desktop sources as an artifact sidesteps git on Windows.
+      - name: Upload desktop sources for the Windows job
+        uses: actions/upload-artifact@v4
         with:
-          sparse-checkout: VinPlayDesktop
-          sparse-checkout-cone-mode: true
+          name: desktop-src
+          path: |
+            VinPlayDesktop
+            !VinPlayDesktop/build
+            !VinPlayDesktop/.gradle
+          include-hidden-files: true
+          if-no-files-found: error
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
       - run: chmod +x ./gradlew
+        working-directory: VinPlayDesktop
       - name: Compile
         run: ./gradlew compileKotlin --stacktrace
+        working-directory: VinPlayDesktop
 
   windows:
     name: Package for Windows
@@ -42,15 +52,15 @@ jobs:
     runs-on: windows-latest
     defaults:
       run:
-        shell: bash
+        shell: pwsh
         working-directory: VinPlayDesktop
     steps:
-      # Only the desktop folder: the repo also holds the WhatsApp bot, which contains
-      # 'XeonMedia/audio/?.mp3' — '?' is an illegal filename on Windows and fails checkout.
-      - uses: actions/checkout@v4
+      - name: Fetch desktop sources
+        uses: actions/download-artifact@v4
         with:
-          sparse-checkout: VinPlayDesktop
-          sparse-checkout-cone-mode: true
+          name: desktop-src
+          path: VinPlayDesktop
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -59,17 +69,15 @@ jobs:
 
       # Portable app image — always works, no installer toolchain needed.
       - name: Build portable app
-        run: ./gradlew createDistributable --stacktrace
+        run: .\gradlew.bat createDistributable --stacktrace
 
       # MSI needs the WiX toolset; don't fail the build if it isn't available.
       - name: Build MSI installer
         continue-on-error: true
-        run: ./gradlew packageMsi --stacktrace
+        run: .\gradlew.bat packageMsi --stacktrace
 
       - name: Zip portable app
-        run: |
-          cd build/compose/binaries/main/app
-          7z a -tzip ../../../../../VinPlayManager-windows-portable.zip .
+        run: Compress-Archive -Path "build\compose\binaries\main\app\*" -DestinationPath "VinPlayManager-windows-portable.zip" -Force
 
       - name: Upload portable app
         uses: actions/upload-artifact@v4
