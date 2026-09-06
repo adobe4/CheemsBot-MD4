@@ -21,7 +21,12 @@ jobs:
       run:
         working-directory: VinPlayDesktop
     steps:
+      # Only the desktop folder: the repo also holds the WhatsApp bot, which contains
+      # 'XeonMedia/audio/?.mp3' — '?' is an illegal filename on Windows and fails checkout.
       - uses: actions/checkout@v4
+        with:
+          sparse-checkout: VinPlayDesktop
+          sparse-checkout-cone-mode: true
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -40,7 +45,12 @@ jobs:
         shell: bash
         working-directory: VinPlayDesktop
     steps:
+      # Only the desktop folder: the repo also holds the WhatsApp bot, which contains
+      # 'XeonMedia/audio/?.mp3' — '?' is an illegal filename on Windows and fails checkout.
       - uses: actions/checkout@v4
+        with:
+          sparse-checkout: VinPlayDesktop
+          sparse-checkout-cone-mode: true
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

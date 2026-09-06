@@ -100,7 +100,7 @@ class ChannelRepository @Inject constructor(
         filter.group?.let { sb.append("AND c.groupTitle = ? "); args += it }
         filter.kindName?.let { sb.append("AND c.kind = ? "); args += it }
         sb.append(tail)
-        args += tailArgs
+        args.addAll(tailArgs)
         return SimpleSQLiteQuery(sb.toString(), args.toTypedArray())
     }
 
