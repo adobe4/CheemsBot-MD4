@@ -1,0 +1,76 @@
+name: Windows build (VinPlay Manager)
+
+on:
+  push:
+    branches:
+      - "claude/vin-play-m3u-app-**"
+    paths:
+      - "VinPlayDesktop/**"
+      - ".github/workflows/desktop.yml"
+  pull_request:
+    paths:
+      - "VinPlayDesktop/**"
+      - ".github/workflows/desktop.yml"
+  workflow_dispatch:
+
+jobs:
+  compile:
+    name: Compile (fast check)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: VinPlayDesktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - run: chmod +x ./gradlew
+      - name: Compile
+        run: ./gradlew compileKotlin --stacktrace
+
+  windows:
+    name: Package for Windows
+    needs: compile
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: VinPlayDesktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Portable app image — always works, no installer toolchain needed.
+      - name: Build portable app
+        run: ./gradlew createDistributable --stacktrace
+
+      # MSI needs the WiX toolset; don't fail the build if it isn't available.
+      - name: Build MSI installer
+        continue-on-error: true
+        run: ./gradlew packageMsi --stacktrace
+
+      - name: Zip portable app
+        run: |
+          cd build/compose/binaries/main/app
+          7z a -tzip ../../../../../VinPlayManager-windows-portable.zip .
+
+      - name: Upload portable app
+        uses: actions/upload-artifact@v4
+        with:
+          name: VinPlayManager-windows-portable
+          path: VinPlayDesktop/VinPlayManager-windows-portable.zip
+          if-no-files-found: error
+
+      - name: Upload MSI installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: VinPlayManager-windows-installer
+          path: VinPlayDesktop/build/compose/binaries/main/msi/*.msi
+          if-no-files-found: warn

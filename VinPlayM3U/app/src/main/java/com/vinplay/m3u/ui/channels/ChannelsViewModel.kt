@@ -19,6 +19,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -67,11 +68,17 @@ class ChannelsViewModel @Inject constructor(
     private val filterFlow = MutableStateFlow(ChannelFilter())
     private var loadJob: Job? = null
 
+    /**
+     * One debounced count per filter instead of a live Flow that re-counted on every database
+     * change — counting is a full query and was competing with the search itself.
+     */
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun observeCount() {
         viewModelScope.launch {
-            filterFlow.flatMapLatest { f -> channelRepository.filteredCount(playlistId, f) }
-                .collectLatest { count -> _ui.value = _ui.value.copy(totalFiltered = count) }
+            filterFlow.collectLatest { f ->
+                delay(250)
+                _ui.value = _ui.value.copy(totalFiltered = channelRepository.filteredCountOnce(playlistId, f))
+            }
         }
     }
 

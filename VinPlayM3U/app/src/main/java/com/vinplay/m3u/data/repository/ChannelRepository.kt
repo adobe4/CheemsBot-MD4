@@ -1,5 +1,8 @@
 package com.vinplay.m3u.data.repository
 
+import androidx.sqlite.db.SimpleSQLiteQuery
+import com.vinplay.m3u.data.local.AppDatabase
+import com.vinplay.m3u.data.local.SearchIndexer
 import com.vinplay.m3u.data.local.dao.ChannelDao
 import com.vinplay.m3u.data.local.entity.ChannelEntity
 import com.vinplay.m3u.data.model.ChannelKind
@@ -23,12 +26,19 @@ import javax.inject.Singleton
 class ChannelRepository @Inject constructor(
     private val channelDao: ChannelDao,
     private val playlistRepository: PlaylistRepository,
-    private val linkTester: LinkTester
+    private val linkTester: LinkTester,
+    private val searchIndexer: SearchIndexer
 ) {
     // ---- Reads ----
 
     suspend fun page(playlistId: Long, filter: ChannelFilter, limit: Int, offset: Int): List<ChannelEntity> =
-        channelDao.pageFiltered(playlistId, filter.query, filter.group, filter.kindName, limit, offset)
+        if (useFts(filter)) {
+            channelDao.rawChannels(
+                ftsQuery("c.*", playlistId, filter, "ORDER BY c.name COLLATE NOCASE LIMIT ? OFFSET ?", limit, offset)
+            )
+        } else {
+            channelDao.pageFiltered(playlistId, filter.query, filter.group, filter.kindName, limit, offset)
+        }
 
     fun filteredCount(playlistId: Long, filter: ChannelFilter): Flow<Int> =
         channelDao.observeFilteredCount(playlistId, filter.query, filter.group, filter.kindName)
@@ -40,10 +50,83 @@ class ChannelRepository @Inject constructor(
     // ---- Global (all playlists) reads ----
 
     suspend fun pageGlobal(filter: ChannelFilter, limit: Int, offset: Int): List<ChannelEntity> =
-        channelDao.pageGlobal(filter.query, filter.kindName, limit, offset)
+        if (useFts(filter)) {
+            channelDao.rawChannels(
+                ftsQuery("c.*", null, filter, "ORDER BY c.name COLLATE NOCASE LIMIT ? OFFSET ?", limit, offset)
+            )
+        } else {
+            channelDao.pageGlobal(filter.query, filter.kindName, limit, offset)
+        }
 
-    fun globalCount(filter: ChannelFilter): Flow<Int> =
-        channelDao.observeGlobalCount(filter.query, filter.kindName)
+    /**
+     * One-shot count. This used to be an observed Flow, which re-ran a full-table COUNT on every
+     * database change — on a large library that alone kept the app busy. Callers fetch it once the
+     * rows are on screen instead.
+     */
+    suspend fun globalCountOnce(filter: ChannelFilter): Int =
+        if (useFts(filter)) {
+            channelDao.rawCount(ftsQuery("COUNT(*)", null, filter, ""))
+        } else {
+            channelDao.rawCount(likeCountQuery(null, filter))
+        }
+
+    suspend fun filteredCountOnce(playlistId: Long, filter: ChannelFilter): Int =
+        if (useFts(filter)) {
+            channelDao.rawCount(ftsQuery("COUNT(*)", playlistId, filter, ""))
+        } else {
+            channelDao.rawCount(likeCountQuery(playlistId, filter))
+        }
+
+    // ---- Full-text search plumbing ----
+
+    /** FTS only kicks in for an actual search term, and only once the index has been built. */
+    private fun useFts(filter: ChannelFilter) = filter.query.isNotBlank() && searchIndexer.isReady
+
+    private fun ftsQuery(
+        select: String,
+        playlistId: Long?,
+        filter: ChannelFilter,
+        tail: String,
+        vararg tailArgs: Any
+    ): SimpleSQLiteQuery {
+        val args = mutableListOf<Any>()
+        val fts = AppDatabase.FTS_TABLE
+        val sb = StringBuilder(
+            "SELECT $select FROM channels c JOIN $fts ON $fts.docid = c.rowid WHERE $fts MATCH ? "
+        )
+        args += ftsMatch(filter.query)
+        sb.append("AND c.deletedAt IS NULL ")
+        playlistId?.let { sb.append("AND c.playlistId = ? "); args += it }
+        filter.group?.let { sb.append("AND c.groupTitle = ? "); args += it }
+        filter.kindName?.let { sb.append("AND c.kind = ? "); args += it }
+        sb.append(tail)
+        args += tailArgs
+        return SimpleSQLiteQuery(sb.toString(), args.toTypedArray())
+    }
+
+    private fun likeCountQuery(playlistId: Long?, filter: ChannelFilter): SimpleSQLiteQuery {
+        val args = mutableListOf<Any>()
+        val sb = StringBuilder("SELECT COUNT(*) FROM channels c WHERE c.deletedAt IS NULL ")
+        playlistId?.let { sb.append("AND c.playlistId = ? "); args += it }
+        filter.group?.let { sb.append("AND c.groupTitle = ? "); args += it }
+        filter.kindName?.let { sb.append("AND c.kind = ? "); args += it }
+        if (filter.query.isNotBlank()) {
+            sb.append("AND c.name LIKE ? ")
+            args += "%${filter.query}%"
+        }
+        return SimpleSQLiteQuery(sb.toString(), args.toTypedArray())
+    }
+
+    /**
+     * Turns typed text into an FTS4 MATCH expression — each word becomes a prefix term, so
+     * "sky sp" matches "Sky Sports". Punctuation is stripped because it is query syntax to FTS.
+     */
+    private fun ftsMatch(query: String): String =
+        query.split(Regex("\\s+"))
+            .map { it.replace(Regex("[^\\p{L}\\p{N}_]"), "") }
+            .filter { it.isNotBlank() }
+            .joinToString(" ") { "$it*" }
+            .ifBlank { "\"\"" }
 
     /** Move channels from anywhere into a target playlist (used by the All-Channels hub). */
     suspend fun moveManyToPlaylistGlobal(ids: List<Long>, targetPlaylistId: Long) {

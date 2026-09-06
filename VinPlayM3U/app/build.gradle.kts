@@ -15,8 +15,8 @@ android {
         // (namespace stays com.vinplay.m3u for the code.)
         minSdk = 24
         targetSdk = 35
-        versionCode = 8
-        versionName = "1.5.0"
+        versionCode = 9
+        versionName = "1.6.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }

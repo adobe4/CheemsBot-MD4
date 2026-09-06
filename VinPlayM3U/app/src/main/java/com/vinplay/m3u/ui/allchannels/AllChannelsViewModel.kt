@@ -15,6 +15,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -56,10 +57,19 @@ class AllChannelsViewModel @Inject constructor(
     private val filterFlow = MutableStateFlow(ChannelFilter())
     private var loadJob: Job? = null
 
+    /**
+     * Counting is a second full query, so it runs after the rows are already on screen and only
+     * once per filter — not as a live Flow that re-counted on every database change.
+     */
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun observeCount() = viewModelScope.launch {
-        filterFlow.flatMapLatest { channelRepository.globalCount(it) }
-            .collectLatest { _ui.value = _ui.value.copy(totalFiltered = it) }
+        // collectLatest + delay debounces typing: each keystroke cancels the pending query, so a
+        // huge library is searched once the user pauses instead of on every character.
+        filterFlow.collectLatest { f ->
+            delay(250)
+            reload()
+            _ui.value = _ui.value.copy(totalFiltered = channelRepository.globalCountOnce(f))
+        }
     }
 
     init {
@@ -76,8 +86,7 @@ class AllChannelsViewModel @Inject constructor(
     private inline fun updateFilter(transform: (ChannelFilter) -> ChannelFilter) {
         val next = transform(_ui.value.filter)
         _ui.value = _ui.value.copy(filter = next)
-        filterFlow.value = next
-        reload()
+        filterFlow.value = next // the debounced collector performs the reload
     }
 
     private fun reload() {

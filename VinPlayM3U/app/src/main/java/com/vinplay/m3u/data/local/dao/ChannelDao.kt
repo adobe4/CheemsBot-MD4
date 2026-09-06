@@ -3,8 +3,10 @@ package com.vinplay.m3u.data.local.dao
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.RawQuery
 import androidx.room.Transaction
 import androidx.room.Update
+import androidx.sqlite.db.SupportSQLiteQuery
 import com.vinplay.m3u.data.local.entity.ChannelEntity
 import com.vinplay.m3u.data.model.TestStatus
 import kotlinx.coroutines.flow.Flow
@@ -87,6 +89,17 @@ interface ChannelDao {
 
     @Query("SELECT DISTINCT groupTitle FROM channels WHERE playlistId = :playlistId AND deletedAt IS NULL ORDER BY groupTitle ASC")
     fun observeGroups(playlistId: Long): Flow<List<String>>
+
+    // ---- Full-text search ----
+    //
+    // channels_fts is created outside Room (see AppDatabase.createFts), so these go through
+    // @RawQuery: Room doesn't compile-check the SQL and never schema-validates the virtual table.
+
+    @RawQuery
+    suspend fun rawChannels(query: SupportSQLiteQuery): List<ChannelEntity>
+
+    @RawQuery
+    suspend fun rawCount(query: SupportSQLiteQuery): Int
 
     // ---- Global (all playlists) ----
 
