@@ -495,15 +495,13 @@ private fun ChannelRow(
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (selectionActive) {
-            Icon(
-                if (selected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
-                contentDescription = if (selected) "Selected" else "Not selected",
-                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        } else {
-            LogoThumb(logo = channel.tvgLogo, status = channel.testStatus)
-        }
+        // The thumbnail stays put in selection mode so the test-result dot remains visible;
+        // the tick is added as a corner badge instead of replacing it.
+        LogoThumb(
+            logo = channel.tvgLogo,
+            status = channel.testStatus,
+            selected = if (selectionActive) selected else null
+        )
         Column(Modifier.weight(1f).padding(start = 12.dp)) {
             Text(channel.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(

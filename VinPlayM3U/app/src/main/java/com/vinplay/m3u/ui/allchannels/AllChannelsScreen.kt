@@ -49,7 +49,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.vinplay.m3u.data.local.entity.ChannelEntity
 import com.vinplay.m3u.data.model.ChannelKind
+import com.vinplay.m3u.ui.channels.EditChannelDialog
 import com.vinplay.m3u.ui.channels.MoveToPlaylistDialog
 import com.vinplay.m3u.ui.components.EmptyState
 import com.vinplay.m3u.ui.components.LoadingSkeleton
@@ -71,6 +73,8 @@ fun AllChannelsScreen(
     var searchOpen by remember { mutableStateOf(true) }
     var overflowOpen by remember { mutableStateOf(false) }
     var moveTo by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<ChannelEntity?>(null) }
+    var menuFor by remember { mutableStateOf<Long?>(null) }
     var newPlaylist by remember { mutableStateOf(false) }
 
     val loadMore by remember {
@@ -194,15 +198,11 @@ fun AllChannelsScreen(
                                 .padding(horizontal = 16.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            if (selectionActive) {
-                                Icon(
-                                    if (channel.id in selectedIds) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
-                                    contentDescription = null,
-                                    tint = if (channel.id in selectedIds) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            } else {
-                                LogoThumb(logo = channel.tvgLogo, status = channel.testStatus)
-                            }
+                            LogoThumb(
+                                logo = channel.tvgLogo,
+                                status = channel.testStatus,
+                                selected = if (selectionActive) channel.id in selectedIds else null
+                            )
                             Column(Modifier.weight(1f).padding(start = 12.dp)) {
                                 Text(channel.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text(
@@ -216,11 +216,42 @@ fun AllChannelsScreen(
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
+                            // Per-row actions so a channel found by searching every playlist can be
+                            // fixed right here instead of having to open its playlist first.
+                            if (!selectionActive) {
+                                Box {
+                                    IconButton(onClick = { menuFor = channel.id }) {
+                                        Icon(Icons.Default.MoreVert, contentDescription = "Channel actions")
+                                    }
+                                    DropdownMenu(
+                                        expanded = menuFor == channel.id,
+                                        onDismissRequest = { menuFor = null }
+                                    ) {
+                                        DropdownMenuItem(text = { Text("Play") }, onClick = {
+                                            menuFor = null; viewModel.play(channel)
+                                        })
+                                        DropdownMenuItem(text = { Text("Edit channel") }, onClick = {
+                                            menuFor = null; editing = channel
+                                        })
+                                        DropdownMenuItem(text = { Text("Move to trash") }, onClick = {
+                                            menuFor = null; viewModel.softDelete(channel)
+                                        })
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
         }
+    }
+
+    editing?.let { channel ->
+        EditChannelDialog(
+            channel = channel,
+            onSave = { viewModel.updateChannel(it); editing = null },
+            onDismiss = { editing = null }
+        )
     }
 
     if (moveTo) {

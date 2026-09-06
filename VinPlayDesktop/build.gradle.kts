@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "com.vinplay.desktop"
-version = "1.0.0"
+version = "1.0.1"
 
 // Target 17 bytecode using whatever JDK (17+) runs the build, rather than pinning a toolchain
 // that must be installed locally.
@@ -44,11 +44,18 @@ compose.desktop {
         mainClass = "com.vinplay.desktop.MainKt"
 
         nativeDistributions {
+            // The bundled runtime is trimmed by jlink to the modules jdeps can see. JDBC drivers are
+            // loaded reflectively via ServiceLoader, so java.sql was dropped and the app died with
+            // "java/sql/DriverManager — Failed to launch JVM". Bundling every module also keeps
+            // HTTPS working (jdk.crypto.ec) and covers anything else loaded reflectively; it costs
+            // some size, which matters far less here than the app actually starting.
+            includeAllModules = true
+
             // MSI needs the WiX toolset; the portable app image (createDistributable) always works,
             // so CI ships that as a zip and the installer only when the toolchain is available.
             targetFormats(TargetFormat.Msi, TargetFormat.Deb)
             packageName = "VinPlay Manager"
-            packageVersion = "1.0.0"
+            packageVersion = "1.0.1"
             description = "Manage, search and test very large IPTV playlists"
             vendor = "VinPlay"
 

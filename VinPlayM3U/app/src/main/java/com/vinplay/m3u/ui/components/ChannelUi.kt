@@ -3,8 +3,11 @@ package com.vinplay.m3u.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -31,9 +34,15 @@ fun statusColor(status: TestStatus): Color = when (status) {
     TestStatus.UNTESTED -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
 }
 
-/** Channel logo thumbnail (tvg-logo) with the link-test status shown as a small corner dot. */
+/**
+ * Channel logo thumbnail (tvg-logo) with the link-test status as a small corner dot.
+ *
+ * [selected] drives the selection badge: null means selection mode is off. The badge sits in the
+ * top-start corner rather than replacing the thumbnail, so the logo and the test-result dot stay
+ * visible (and stay put) while picking channels.
+ */
 @Composable
-fun LogoThumb(logo: String?, status: TestStatus) {
+fun LogoThumb(logo: String?, status: TestStatus, selected: Boolean? = null) {
     Box(Modifier.size(44.dp)) {
         val shape = RoundedCornerShape(8.dp)
         if (logo.isNullOrBlank()) {
@@ -52,5 +61,18 @@ fun LogoThumb(logo: String?, status: TestStatus) {
             )
         }
         StatusDot(color = statusColor(status), modifier = Modifier.align(Alignment.BottomEnd))
+
+        if (selected != null) {
+            Icon(
+                imageVector = if (selected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                contentDescription = if (selected) "Selected" else "Not selected",
+                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .size(18.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surface)
+            )
+        }
     }
 }

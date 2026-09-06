@@ -119,6 +119,22 @@ class AllChannelsViewModel @Inject constructor(
 
     fun play(channel: ChannelEntity) = playbackController.play(channel)
 
+    /** Full edit (name, stream URL, group, type, logo, headers) without leaving the search results. */
+    fun updateChannel(updated: ChannelEntity) = viewModelScope.launch {
+        channelRepository.update(updated)
+        reload()
+    }
+
+    fun updateUrl(channel: ChannelEntity, url: String) = viewModelScope.launch {
+        channelRepository.updateUrl(channel.id, url, channel.playlistId)
+        reload()
+    }
+
+    fun softDelete(channel: ChannelEntity) = viewModelScope.launch {
+        channelRepository.softDelete(listOf(channel.id), channel.playlistId)
+        reload()
+    }
+
     fun moveSelectedToPlaylist(targetPlaylistId: Long) = viewModelScope.launch {
         channelRepository.moveManyToPlaylistGlobal(_selectedIds.value.toList(), targetPlaylistId)
         clearSelection()
