@@ -32,6 +32,7 @@ class AppState(private val scope: CoroutineScope) {
 
     companion object {
         const val PAGE = 300
+        private val LINK_REGEX = Regex("""https?://\S+""", RegexOption.IGNORE_CASE)
     }
 
     private val store = Store(AppPaths.database)
@@ -270,6 +271,48 @@ class AppState(private val scope: CoroutineScope) {
         val r = importer.fromUrl(playlistId, url) { busy = "Imported ${"%,d".format(it)}…" }
         finishImport(r.imported, r.error)
     }
+
+    /**
+     * Bulk paste: pull every http(s) link out of arbitrary pasted text and import them in turn,
+     * the same way the phone app's bulk import works. Trailing punctuation from prose/markdown is
+     * trimmed, and duplicates are collapsed.
+     */
+    fun importBulk(playlistId: Long, text: String) = scope.launch {
+        val links = LINK_REGEX.findAll(text)
+            .map { it.value.trim().trimEnd(',', ';', ')', ']', '>', '"', '\'', '.') }
+            .filter { it.length > "http://".length }
+            .distinct()
+            .toList()
+        if (links.isEmpty()) {
+            statusMessage = "No links found in that text"
+            return@launch
+        }
+        var imported = 0
+        var failed = 0
+        var firstError: String? = null
+        links.forEachIndexed { index, link ->
+            busy = "Link ${index + 1}/${links.size}…"
+            val r = importer.fromUrl(playlistId, link) {
+                busy = "Link ${index + 1}/${links.size}: ${"%,d".format(it)} channels…"
+            }
+            if (r.error != null) {
+                failed++
+                if (firstError == null) firstError = r.error
+            } else {
+                imported += r.imported
+            }
+        }
+        busy = null
+        statusMessage = buildString {
+            append("Imported ${"%,d".format(imported)} channels from ${links.size - failed}/${links.size} link(s)")
+            firstError?.let { append(" · first failure: $it") }
+        }
+        refreshPlaylists()
+        reload()
+    }
+
+    fun countLinks(text: String): Int =
+        LINK_REGEX.findAll(text).map { it.value }.distinct().count()
 
     fun importXtream(playlistId: Long, server: String, user: String, pass: String) = scope.launch {
         busy = "Connecting…"
