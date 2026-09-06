@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -51,6 +52,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
@@ -80,30 +82,40 @@ import javax.swing.JFileChooser
 import javax.swing.filechooser.FileNameExtensionFilter
 
 /**
- * Full dark palette. Every slot the UI touches is defined, so nothing falls back to the Material
- * baseline purple and clashes with the rest.
+ * Red dark palette.
+ *
+ * Every `on…` colour here is deliberately light. Material would normally put dark text on a bright
+ * container, but this app is dark-only and dark-on-dark was the exact complaint, so contrast is
+ * always achieved with light text instead.
  */
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFF8B7BFF),
-    onPrimary = Color(0xFF14102C),
-    primaryContainer = Color(0xFF2B2455),
-    onPrimaryContainer = Color(0xFFDCD6FF),
-    secondary = Color(0xFF35C5AC),
-    onSecondary = Color(0xFF00201A),
-    secondaryContainer = Color(0xFF0D3C35),
-    onSecondaryContainer = Color(0xFFA8F2E3),
+    primary = Color(0xFFFF4757),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFF5A1A21),
+    onPrimaryContainer = Color(0xFFFFD9DC),
+    inversePrimary = Color(0xFFFF8A94),
+    secondary = Color(0xFFFF8A6B),
+    onSecondary = Color(0xFFFFFFFF),
+    secondaryContainer = Color(0xFF4E2018),
+    onSecondaryContainer = Color(0xFFFFDCD2),
     tertiary = Color(0xFFE0B036),
-    onTertiary = Color(0xFF241A00),
-    background = Color(0xFF0E0E14),
-    onBackground = Color(0xFFE8E8EF),
-    surface = Color(0xFF15151D),
-    onSurface = Color(0xFFE8E8EF),
-    surfaceVariant = Color(0xFF232330),
-    onSurfaceVariant = Color(0xFFAFAFC2),
-    outline = Color(0xFF3B3B4A),
-    outlineVariant = Color(0xFF2A2A36),
-    error = Color(0xFFFF6B6B),
-    onError = Color(0xFF2B0000),
+    onTertiary = Color(0xFF1A1200),
+    tertiaryContainer = Color(0xFF4A3A08),
+    onTertiaryContainer = Color(0xFFFFE8AE),
+    background = Color(0xFF121013),
+    onBackground = Color(0xFFF0EAEB),
+    surface = Color(0xFF1A1619),
+    onSurface = Color(0xFFF0EAEB),
+    surfaceVariant = Color(0xFF2A2226),
+    onSurfaceVariant = Color(0xFFC4B7BA),
+    outline = Color(0xFF4A3D41),
+    outlineVariant = Color(0xFF322A2E),
+    error = Color(0xFFFF8A80),
+    onError = Color(0xFF3A0A08),
+    errorContainer = Color(0xFF5A1512),
+    onErrorContainer = Color(0xFFFFDAD6),
+    inverseSurface = Color(0xFFF0EAEB),
+    inverseOnSurface = Color(0xFF1A1619),
     scrim = Color(0xFF000000)
 )
 
@@ -124,35 +136,44 @@ fun App() {
     var editing by remember { mutableStateOf<Channel?>(null) }
 
     MaterialTheme(colorScheme = DarkColors) {
-        BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            val compact = maxWidth < COMPACT_WIDTH
-            var sidebarOpen by remember { mutableStateOf(true) }
-            // Narrow window: start with the sidebar out of the way, but let the user pull it back.
-            LaunchedEffect(compact) { sidebarOpen = !compact }
+        // Surface — not just a background modifier — is what supplies LocalContentColor. Without
+        // one, every Text with no explicit colour falls back to Material's default of black, which
+        // is what made channel names invisible on the dark background.
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background,
+            contentColor = MaterialTheme.colorScheme.onBackground
+        ) {
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                val compact = maxWidth < COMPACT_WIDTH
+                var sidebarOpen by remember { mutableStateOf(true) }
+                // Narrow window: start with the sidebar out of the way, but let the user pull it back.
+                LaunchedEffect(compact) { sidebarOpen = !compact }
 
-            Column(Modifier.fillMaxSize()) {
-                Row(Modifier.weight(1f)) {
-                    if (sidebarOpen) {
-                        Sidebar(
+                Column(Modifier.fillMaxSize()) {
+                    Row(Modifier.weight(1f)) {
+                        if (sidebarOpen) {
+                            Sidebar(
+                                state = state,
+                                onImport = { showImport = true },
+                                onNewPlaylist = { showNewPlaylist = true },
+                                onSettings = { showSettings = true },
+                                onClose = if (compact) ({ sidebarOpen = false }) else null
+                            )
+                            HorizontalDividerVertical()
+                        }
+                        ChannelPane(
                             state = state,
-                            onImport = { showImport = true },
-                            onNewPlaylist = { showNewPlaylist = true },
-                            onSettings = { showSettings = true },
-                            onClose = if (compact) ({ sidebarOpen = false }) else null
+                            compact = compact,
+                            onToggleSidebar = if (!sidebarOpen) ({ sidebarOpen = true }) else null,
+                            onMoveTo = { showMoveTo = true },
+                            onMoveToNew = { showMoveToNew = true },
+                            onEdit = { editing = it },
+                            onImport = { showImport = true }
                         )
-                        HorizontalDividerVertical()
                     }
-                    ChannelPane(
-                        state = state,
-                        compact = compact,
-                        onToggleSidebar = if (!sidebarOpen) ({ sidebarOpen = true }) else null,
-                        onMoveTo = { showMoveTo = true },
-                        onMoveToNew = { showMoveToNew = true },
-                        onEdit = { editing = it },
-                        onImport = { showImport = true }
-                    )
+                    StatusBar(state)
                 }
-                StatusBar(state)
             }
         }
 
@@ -199,11 +220,12 @@ private fun Sidebar(
     onSettings: () -> Unit,
     onClose: (() -> Unit)?
 ) {
-    Column(
-        Modifier.widthIn(min = 220.dp, max = 260.dp).fillMaxHeight()
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 10.dp, vertical = 12.dp)
+    Surface(
+        modifier = Modifier.widthIn(min = 220.dp, max = 260.dp).fillMaxHeight(),
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface
     ) {
+    Column(Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 "VinPlay Manager",
@@ -263,6 +285,7 @@ private fun Sidebar(
         OutlinedButton(onClick = onSettings, modifier = Modifier.fillMaxWidth(), contentPadding = padding8()) {
             Icon(Icons.Default.Settings, null, Modifier.size(14.dp)); Text("  Settings", fontSize = 12.sp)
         }
+    }
     }
 }
 
@@ -417,29 +440,31 @@ private fun ChannelPane(
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.padding(end = 6.dp).align(Alignment.CenterVertically)
                 )
-                TextButton(onClick = { state.selectAllLoaded() }, contentPadding = padding8()) { Text("Select loaded", fontSize = 12.sp) }
-                TextButton(onClick = { state.testSelected() }, contentPadding = padding8()) { Text("Test", fontSize = 12.sp) }
-                TextButton(onClick = onMoveTo, contentPadding = padding8()) { Text("Move to…", fontSize = 12.sp) }
-                TextButton(onClick = onMoveToNew, contentPadding = padding8()) { Text("Move to new", fontSize = 12.sp) }
+                TextButton(onClick = { state.selectAllLoaded() }, contentPadding = padding8(), colors = selectionButtonColors()) { Text("Select loaded", fontSize = 12.sp) }
+                TextButton(onClick = { state.testSelected() }, contentPadding = padding8(), colors = selectionButtonColors()) { Text("Test", fontSize = 12.sp) }
+                TextButton(onClick = onMoveTo, contentPadding = padding8(), colors = selectionButtonColors()) { Text("Move to…", fontSize = 12.sp) }
+                TextButton(onClick = onMoveToNew, contentPadding = padding8(), colors = selectionButtonColors()) { Text("Move to new", fontSize = 12.sp) }
                 if (state.filter.showDeleted) {
-                    TextButton(onClick = { state.restoreSelected() }, contentPadding = padding8()) { Text("Restore", fontSize = 12.sp) }
-                    TextButton(onClick = { state.purgeSelected() }, contentPadding = padding8()) { Text("Delete forever", fontSize = 12.sp) }
+                    TextButton(onClick = { state.restoreSelected() }, contentPadding = padding8(), colors = selectionButtonColors()) { Text("Restore", fontSize = 12.sp) }
+                    TextButton(onClick = { state.purgeSelected() }, contentPadding = padding8(), colors = selectionButtonColors()) { Text("Delete forever", fontSize = 12.sp) }
                 } else {
-                    TextButton(onClick = { state.deleteSelected() }, contentPadding = padding8()) { Text("Trash", fontSize = 12.sp) }
+                    TextButton(onClick = { state.deleteSelected() }, contentPadding = padding8(), colors = selectionButtonColors()) { Text("Trash", fontSize = 12.sp) }
                 }
-                TextButton(onClick = { state.clearSelection() }, contentPadding = padding8()) { Text("Clear", fontSize = 12.sp) }
+                TextButton(onClick = { state.clearSelection() }, contentPadding = padding8(), colors = selectionButtonColors()) { Text("Clear", fontSize = 12.sp) }
             }
         }
 
         Spacer(Modifier.height(8.dp))
         val byId = remember(state.playlists) { state.playlists.associate { it.id to it.name } }
 
-        Box(
-            Modifier.weight(1f).fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surface)
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
+        Surface(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
+        Box(Modifier.fillMaxSize()) {
             when {
                 state.loading && state.channels.isEmpty() ->
                     CircularProgressIndicator(Modifier.align(Alignment.Center))
@@ -466,6 +491,7 @@ private fun ChannelPane(
                 }
             }
         }
+        }
     }
 }
 
@@ -482,6 +508,11 @@ private fun KindChip(label: String, selected: Boolean, onClick: () -> Unit) {
         )
     )
 }
+
+/** Buttons that sit on the red selection bar need its light on-container colour, not primary red. */
+@Composable
+private fun selectionButtonColors() =
+    ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onPrimaryContainer)
 
 @Composable
 private fun SmallAction(label: String, onClick: () -> Unit) {
@@ -539,9 +570,9 @@ private fun StatusBar(state: AppState) {
             )
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Surface(color = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface) {
         Row(
-            Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)
-                .padding(horizontal = 12.dp, vertical = 6.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             val text = state.busy
@@ -555,6 +586,7 @@ private fun StatusBar(state: AppState) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+        }
         }
     }
 }
@@ -769,7 +801,7 @@ fun statusColor(status: TestStatus): Color = when (status) {
     TestStatus.DEAD -> Color(0xFFE0483B)
     TestStatus.TIMEOUT -> Color(0xFFE07A3B)
     TestStatus.ERROR -> Color(0xFFB0483B)
-    TestStatus.TESTING -> Color(0xFF8B7BFF)
+    TestStatus.TESTING -> Color(0xFF5AA9FF)
     TestStatus.UNTESTED -> Color(0xFF55556A)
 }
 

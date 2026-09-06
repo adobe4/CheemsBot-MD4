@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "com.vinplay.desktop"
-version = "1.1.0"
+version = "1.2.0"
 
 // Target 17 bytecode using whatever JDK (17+) runs the build, rather than pinning a toolchain
 // that must be installed locally.
@@ -55,7 +55,7 @@ compose.desktop {
             // so CI ships that as a zip and the installer only when the toolchain is available.
             targetFormats(TargetFormat.Msi, TargetFormat.Deb)
             packageName = "VinPlay Manager"
-            packageVersion = "1.1.0"
+            packageVersion = "1.2.0"
             description = "Manage, search and test very large IPTV playlists"
             vendor = "VinPlay"
 
